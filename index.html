@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Наша Пошта — симулятор відділення</title>
 <meta name="theme-color" content="#d62828">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Наша Пошта">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <style>
@@ -48,6 +54,7 @@ input,select{font:inherit;padding:9px 11px;border:1px solid var(--line);border-r
   #tabs button{flex:1;padding:6px 2px;font-size:11px;border:0;display:flex;flex-direction:column;align-items:center;background:transparent}
   #tabs button .ti{font-size:20px}#tabs button.on{background:var(--red3);color:var(--red2)}}
 @media(min-width:701px){#tabs button .ti{margin-right:4px}}
+@media(max-width:700px){.topbtn.hm{display:none}}
 main{padding:4px 10px}
 .card{background:var(--card);border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px #0000000d;border:1px solid var(--line)}
 .card h3{margin:0 0 8px;font-size:16px;display:flex;align-items:center;gap:6px}
@@ -165,6 +172,20 @@ main{padding:4px 10px}
 .hearts{color:var(--red);font-size:12px}
 .code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
 .guide li{margin-bottom:6px}
+/* анімований зал */
+#scene{position:relative;height:150px;border-radius:12px;overflow:hidden;margin-bottom:8px;border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--wallc,#f1eee9) 0,var(--wallc,#f1eee9) 34%,#cdbfa9 34%,#cdbfa9 36%,#e9e0d2 36%),repeating-linear-gradient(90deg,#0000 0 39px,#0000000d 39px 40px)}
+#scene .door{position:absolute;right:6px;top:8px;font-size:44px}
+#scene .deco{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:20px;display:flex;gap:6px;opacity:.9}
+#scene .wins{position:absolute;left:6px;top:6px;display:flex;flex-direction:column;gap:2px}
+#scene .wn{font-size:13px;background:#ffffffcc;border-radius:8px;padding:1px 6px;display:flex;align-items:center;gap:3px;border:1px solid var(--line)}
+#scene .wn b{font-size:20px}
+.spr{position:absolute;font-size:30px;line-height:1;transition:left 1.4s linear,top 1.4s linear,opacity .6s;cursor:pointer;text-align:center;transform:translateX(-50%)}
+.spr.walk .face{animation:bob .35s ease-in-out infinite}
+.spr .carry{position:absolute;right:-12px;bottom:-2px;font-size:17px}
+.spr .mood{position:absolute;left:50%;top:-14px;transform:translateX(-50%);font-size:13px}
+.spr.reg .face{filter:drop-shadow(0 0 3px #e89a00)}
+@keyframes bob{50%{transform:translateY(-4px)}}
 .visit{margin-top:8px}.visit .vq{display:flex;gap:6px;font-size:28px;justify-content:center;min-height:36px}.visit .vw{display:flex;gap:10px;justify-content:center;font-size:24px;flex-wrap:wrap}
 .decor{display:flex;gap:6px;font-size:24px;justify-content:flex-end;margin:-4px 0 -6px;flex-wrap:wrap}
 .traits{display:flex;gap:4px;flex-wrap:wrap;margin:3px 0}.traits span{background:var(--blue2);color:var(--blue);border-radius:8px;padding:1px 6px;font-size:12px;font-weight:600}
@@ -210,7 +231,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610312008; // ставиться build.py
+const GAME_BUILD = 202610312011; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -513,6 +534,68 @@ const sScan = () => beep(1900, 0.09);
 const sErr = () => beep(180, 0.25, 'sawtooth', 0.06);
 const sCash = () => { beep(1320, 0.08, 'triangle', 0.08); setTimeout(() => beep(1760, 0.15, 'triangle', 0.08), 90); };
 const sBell = () => { beep(880, 0.2, 'sine', 0.06); };
+const sDoor = () => { beep(1568, 0.25, 'sine', 0.025); setTimeout(() => beep(1175, 0.35, 'sine', 0.02), 140); };
+function noiseBuf(sec){
+  const b = AC.createBuffer(1, AC.sampleRate*sec, AC.sampleRate), d = b.getChannelData(0);
+  let last = 0; for (let i=0;i<d.length;i++){ const w = Math.random()*2-1; last = (last + 0.02*w)/1.02; d[i] = last*3.5; }
+  return b;
+}
+// принтер ТТН: «д-р-р-р-р»
+function sPrinter(){
+  if (!G || !G.settings.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const src = AC.createBufferSource(); src.buffer = noiseBuf(1.2);
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 3;
+    const g = AC.createGain(); g.gain.value = 0;
+    const t0 = AC.currentTime;
+    for (let i=0;i<22;i++){ g.gain.setValueAtTime(0.35, t0 + i*0.045); g.gain.setValueAtTime(0.05, t0 + i*0.045 + 0.028); }
+    g.gain.setValueAtTime(0, t0 + 1.0);
+    src.connect(bp); bp.connect(g); g.connect(AC.destination); src.start(); src.stop(t0 + 1.1);
+  } catch(e){}
+}
+// «Наступний!» голосом (якщо браузер уміє), інакше — дзвіночок
+function sayNext(){
+  if (!G || !G.settings.sound) return;
+  if (G.settings.voice !== false && window.speechSynthesis){
+    try {
+      const u = new SpeechSynthesisUtterance(pick(['Наступний!','Наступний, будь ласка!','Підходьте!']));
+      u.lang = 'uk-UA'; u.rate = 1.05; u.volume = 0.9;
+      const v = speechSynthesis.getVoices().find(v => /^uk/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^(ru|pl)/i.test(v.lang));
+      if (v) u.voice = v;
+      if (speechSynthesis.getVoices().some(v => /^uk/i.test(v.lang)) || !speechSynthesis.getVoices().length){ speechSynthesis.cancel(); speechSynthesis.speak(u); return; }
+    } catch(e){}
+  }
+  beep(988, 0.12, 'sine', 0.06); setTimeout(() => beep(784, 0.25, 'sine', 0.06), 150);
+}
+// фоновий шум відділення: гул залу + гомін черги
+const AMB = {on:false, g:null, murmur:null};
+function ambientStart(){
+  if (AMB.on || !G || !G.settings.sound || G.settings.ambient === false) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const src = AC.createBufferSource(); src.buffer = noiseBuf(4); src.loop = true;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+    AMB.g = AC.createGain(); AMB.g.gain.value = 0;
+    src.connect(lp); lp.connect(AMB.g); AMB.g.connect(AC.destination); src.start();
+    const m = AC.createBufferSource(); m.buffer = noiseBuf(3); m.loop = true;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 650; bp.Q.value = 1.4;
+    AMB.murmur = AC.createGain(); AMB.murmur.gain.value = 0;
+    m.connect(bp); bp.connect(AMB.murmur); AMB.murmur.connect(AC.destination); m.start();
+    AMB.on = true; AMB.srcs = [src, m];
+  } catch(e){}
+}
+function ambientStop(){ if (!AMB.on) return; try { AMB.srcs.forEach(x => x.stop()); } catch(e){} AMB.on = false; }
+function ambientTick(){
+  if (!AMB.on || !AC) return;
+  const want = G && G.phase === 'day' && !paused && G.settings.sound && G.settings.ambient !== false && !document.hidden;
+  const t = AC.currentTime;
+  AMB.g.gain.setTargetAtTime(want ? 0.05 : 0, t, 0.5);
+  const q = want ? Math.min(1, G.queue.length/8) : 0;
+  AMB.murmur.gain.setTargetAtTime(q * (0.05 + 0.04*Math.sin(t*1.7)*Math.sin(t*0.6)), t, 0.3);
+}
+document.addEventListener('pointerdown', () => ambientStart(), {once:false, passive:true});
 
 /* ---------- сканер штрихкодів ---------- */
 function barsFor(code){
@@ -733,7 +816,7 @@ function clientLeftAngry(c){
   if (FLOW && FLOW.cid === c.id){ FLOW = null; closeModal(); }
   removeClient(c);
   rate(1, c);
-  G.today.angry++;
+  G.today.angry++; SCENE.angry.add(c.id);
   if (G.insp && G.insp.state === 'on') G.insp.angry++;
   sErr();
   toast(`😠 ${esc(c.name)}: «${pick(LEAVE_ANGRY)}»`, 'bad');
@@ -967,6 +1050,7 @@ function cleanHall(){
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null; pullGifts();
   rollDay(); genTasks();
+  SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.seen = false;
   G.staff.forEach(s => { s.bonusDay = 0; });
   if (G.candDay < G.day || !G.cand.length) refreshCand();
   truckArrive('m');
@@ -1047,6 +1131,76 @@ function tick(){
     if (G.time >= 1200) endDay();
   }
   if (dirty && (!ptrDown || now - ptrDown > 1200)){ dirty = false; render(); } else liveUpdate();
+  updScene(); ambientTick();
+}
+
+/* ---------- анімований зал ---------- */
+const SCENE = {el:null, spr:new Map(), angry:new Set(), seen:false};
+function sceneEl(){
+  if (!SCENE.el){
+    SCENE.el = document.createElement('div'); SCENE.el.id = 'scene';
+    SCENE.el.innerHTML = '<div class="wins"></div><div class="deco"></div><div class="door">🚪</div>';
+  }
+  return SCENE.el;
+}
+function scenePos(c, i){
+  const W = SCENE.el.clientWidth || 600;
+  if (c.by){
+    let w = 1;
+    if (c.by !== 'me'){ const k = G.staff.filter(s => s.cl).findIndex(s => s.id === c.by); w = k + 2; }
+    return {x: 74, y: 4 + (w-1)*30, w};
+  }
+  const free = G.queue.filter(q => !q.by), k = free.indexOf(c);
+  const x0 = 96, x1 = W - 64;
+  const perRow = Math.max(2, Math.floor((x1 - x0) / 36) + 1);
+  const n = Math.min(free.length, perRow);
+  const step = Math.min(46, (x1 - x0) / Math.max(1, n - 1));
+  const row = Math.floor(k / perRow), j = k % perRow;
+  return {x: x0 + j*step, y: row ? 56 : 100 - (j % 2) * 5};
+}
+function updScene(){
+  if (!SCENE.el || !SCENE.el.isConnected || !G || G.phase !== 'day') return;
+  const W = SCENE.el.clientWidth || 600;
+  SCENE.el.style.setProperty('--wallc', (WALLS[G.decor.wall] || WALLS.cream)[1]);
+  const wins = []; const busy = G.staff.filter(s => s.cl);
+  for (let w = 1; w <= G.up.windows; w++){ const s = w === 1 ? null : busy[w-2]; wins.push(`<div class="wn">🪟<b>${w === 1 ? '🧑‍💼' : s ? s.av : '·'}</b></div>`); }
+  const wh = wins.join(''); if (SCENE.wh !== wh){ SCENE.el.querySelector('.wins').innerHTML = wh; SCENE.wh = wh; }
+  const dh = Object.keys(G.decor.items||{}).filter(k => DECOR[k]).slice(0, 8).map(k => DECOR[k].e).join(' ');
+  if (SCENE.dh !== dh){ SCENE.el.querySelector('.deco').textContent = dh; SCENE.dh = dh; }
+  const ids = new Set();
+  G.queue.forEach((c, i) => {
+    ids.add(c.id);
+    let d = SCENE.spr.get(c.id);
+    const pos = scenePos(c, i);
+    if (!d){
+      d = document.createElement('div'); d.className = 'spr walk' + (c.reg ? ' reg' : '');
+      d.dataset.act = 'serve'; d.dataset.id = c.id;
+      d.innerHTML = `<span class="face">${c.av}</span>`;
+      d.style.left = (W - 30) + 'px'; d.style.top = '70px';
+      SCENE.el.appendChild(d); SCENE.spr.set(c.id, d); d._kind = c.kind;
+      if (SCENE.seen && TAB === 'hall') sDoor();
+      requestAnimationFrame(() => requestAnimationFrame(() => { d.style.left = pos.x + 'px'; d.style.top = pos.y + 'px'; }));
+      d._t = performance.now();
+    } else if (d._x !== pos.x || d._y !== pos.y){
+      d.style.left = pos.x + 'px'; d.style.top = pos.y + 'px'; d.classList.add('walk'); d._t = performance.now();
+    }
+    d._x = pos.x; d._y = pos.y;
+    if (performance.now() - d._t > 1500) d.classList.remove('walk');
+    const r = c.pat / c.max, mood = c.by ? '' : r < 0.25 ? '😤' : r < 0.5 ? '😐' : '';
+    if (d._m !== mood){ d._m = mood; let m = d.querySelector('.mood'); if (!m){ m = document.createElement('span'); m.className = 'mood'; d.appendChild(m); } m.textContent = mood; }
+    d.dataset.act = c.by ? '' : 'serve';
+  });
+  for (const [id, d] of SCENE.spr){
+    if (ids.has(id)) continue;
+    SCENE.spr.delete(id);
+    const angry = SCENE.angry.delete(id);
+    d.dataset.act = ''; d.classList.add('walk');
+    d.innerHTML = `<span class="face">${angry ? '😠' : d.querySelector('.face').textContent}</span>${angry ? '' : `<span class="carry">${d._kind === 'get' ? '📦' : '🧾'}</span>`}`;
+    requestAnimationFrame(() => { d.style.left = (W - 30) + 'px'; d.style.top = '70px'; });
+    setTimeout(() => { d.style.opacity = '0'; }, 1300);
+    setTimeout(() => d.remove(), 2000);
+  }
+  SCENE.seen = true;
 }
 
 /* ---------- рендер ---------- */
@@ -1066,7 +1220,7 @@ function renderTop(){
     <span class="pill" title="${RANKS[G.rank].n}">${RANKS[G.rank].e} Рів. ${G.level}</span>
     ${G.phase==='day' ? `<button class="topbtn" data-act="pause" title="Пауза">${paused?'▶️':'⏸️'}</button>
     <button class="topbtn" data-act="speed" title="Швидкість">⏩×${G.settings.speed}</button>` : ''}
-    <button class="topbtn" data-act="savenow" title="Зберегти">💾</button>
+    <button class="topbtn hm" data-act="savenow" title="Зберегти">💾</button>
     <button class="topbtn" data-act="guide" title="Як грати">❓</button>
     <button class="topbtn" data-act="settings" title="Налаштування">⚙️</button>
   </div>
@@ -1087,6 +1241,7 @@ function render(){
   const scroll = window.scrollY;
   v.innerHTML = fn();
   if (TAB === 'online') afterOnline();
+  const slot = $('#sceneSlot'); if (slot) slot.replaceWith(sceneEl());
   window.scrollTo(0, scroll);
 }
 function liveUpdate(){
@@ -1136,7 +1291,7 @@ function viewHall(){
     + (I && I.state === 'on' ? `<div class="banner insp">👔 <b>Перевірка регіонального менеджера</b> до ${hhmm(I.until)} — тримай зал чистим, обслуговуй швидко і без помилок!</div>` : '')
     + (O && O.on ? (G.up.gen ? '<div class="banner">🔌 Відключення світла — працює генератор.</div>' : `<div class="banner dark">🔦 <b>Світла немає</b> до ≈${hhmm(O.to)}: термінал і сканер не працюють, тільки готівка, персонал повільніший. Купи 🔌 генератор у покращеннях.</div>`) : '');
   const dirtLbl = G.dirt < 25 ? 'чисто ✨' : G.dirt < 60 ? 'трохи брудно' : 'брудно! клієнти незадоволені';
-  return `${banners}<div class="card hallcard" style="background:${(WALLS[G.decor.wall]||WALLS.cream)[1]}">${decorStrip()}<h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
+  return `${banners}<div id="sceneSlot"></div><div class="card hallcard" style="background:${(WALLS[G.decor.wall]||WALLS.cream)[1]}"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
     <div class="queue">${G.queue.length ? G.queue.map(clientHTML).join('') : '<div class="mute" style="padding:30px 6px">Поки нікого… Розклади посилки по комірках, щоб клієнти могли їх забрати.</div>'}</div>
     <div class="counter"></div>
     <div class="windows">${wins}</div></div>
@@ -1572,7 +1727,7 @@ function flowAct(act, el){
     const ip = G.parcels.find(p => p.id === c.inspect.pid);
     if (ip) returnParcel(ip);
     c.pids = c.pids.filter(id => id !== c.inspect.pid); FLOW.picked = FLOW.picked.filter(id => id !== c.inspect.pid);
-    FLOW.refused = 1; sScan(); countTask('refuse', 1);
+    FLOW.refused = 1; sPrinter(); countTask('refuse', 1);
     if (!c.pids.length) return finishRefuse(c);
     c.inspect = null; FLOW.step = nextGetStep(c, 'cells'); return renderFlow();
   }
@@ -1581,7 +1736,7 @@ function flowAct(act, el){
     if (v !== right){ mistake(rd.type === 'back' ? 'Клієнт просив повернути відправнику!' : rd.type === 'city' ? `Клієнт казав «${rd.city}»!` : `Новий отримувач — ${rd.name}!`); return renderFlow(); }
     sScan(); FLOW.step = nextGetStep(c, 'redir'); return renderFlow();
   }
-  if (act === 'reprint') return finishRedir(c);
+  if (act === 'reprint'){ sPrinter(); return finishRedir(c); }
   if (act === 'valpick'){
     const it = c.items[FLOW.i];
     if (+v !== it.val){ mistake(`Клієнт казав ${fmt(it.val)} ₴!`); return renderFlow(); }
@@ -1624,7 +1779,7 @@ function flowAct(act, el){
     else FLOW.step = 'pay';
     return renderFlow();
   }
-  if (act === 'print') return finishSend(c);
+  if (act === 'print'){ sPrinter(); return finishSend(c); }
 }
 function nextAfterPay(c){ FLOW.step = c.kind === 'get' ? (c.redir ? 'reprint' : 'give') : 'print'; FLOW.pay = {}; }
 function afterPick(c){
@@ -1728,7 +1883,11 @@ function showGuide(){
     <li><b>🚛 О 18:00</b> вечірня машина забирає відправлення — завантаж їх на Рампі.</li>
     <li>Не тримай клієнтів довго — смужка внизу картки показує їхнє терпіння. Від оцінок залежить ⭐ рейтинг відділення.</li>
     <li>Вночі наймай <b>👥 персонал</b>, відправляй його на навчання і купуй <b>🔧 покращення</b>. З ростом рівня з’являться <b>⭐ постійні клієнти</b>.</li>
-    <li><b>🌐 Онлайн</b>: рейтинг відділень інших гравців і загальний чат. Гра зберігається автоматично (і в хмару теж).</li></ol>
+    <li><b>📟 Сканер:</b> щоб «пікнути» посилку, затисни палець (або наведи мишку) на штрихкод. У комірці відскануй саме ту посилку, номер якої показує термінал.</li>
+    <li><b>Особливі клієнти:</b> хочуть розкрити посилку перед оплатою (бій чи не та річ — оформи відмову), просять переадресувати чи повернути посилку, приходять «по посилку для мами» (перевір довіреність — шахраям відмовляй!), шлють цінні речі з оголошеною вартістю. Буває, посилки немає в комірці — шукай на складі.</li>
+    <li><b>Події:</b> свята й розпродажі (більше посилок і додаткова машина), погода, раптова перевірка менеджера (тримай зал чистим 🧹), відключення світла (купи 🔌 генератор).</li>
+    <li><b>🎯 Кар’єра:</b> щоденні завдання, досягнення, підвищення до регіонального керівника і друге відділення в іншому місті. В «Покращеннях» — 🎨 оформлення залу.</li>
+    <li><b>🌐 Онлайн</b>: рейтинг, тижневий конкурс, чат, гостювання у відділеннях друзів з відгуками і подарунки, які приходять посилкою. Гра зберігається автоматично (і в хмару теж). У ⚙️ можна встановити гру на телефон.</li></ol>
     <button class="pri" style="width:100%" data-act="mclose">Зрозуміло, до роботи!</button>`);
 }
 function showSettings(){
@@ -1736,7 +1895,10 @@ function showSettings(){
   showModal('⚙️ Налаштування', `
     <div class="card"><h3>🏤 Відділення</h3><div class="row"><input id="brname" value="${esc(G.branch)}" maxlength="40"><button data-act="rename">Зберегти</button></div>
       <div class="mute" style="margin-top:6px">Нікнейм: <b>${esc(G.nick)}</b></div></div>
-    <div class="card"><h3>🔊 Звук</h3><button data-act="sound">${G.settings.sound ? '🔊 Увімкнено' : '🔇 Вимкнено'}</button></div>
+    <div class="card"><h3>🔊 Звук</h3><div class="row"><button data-act="sound">${G.settings.sound ? '🔊 Звук увімкнено' : '🔇 Звук вимкнено'}</button>
+      <button data-act="ambient">${G.settings.ambient !== false ? '🏢 Фоновий шум: так' : '🏢 Фоновий шум: ні'}</button>
+      <button data-act="voice">${G.settings.voice !== false ? '🗣️ «Наступний!»: так' : '🗣️ «Наступний!»: ні'}</button></div></div>
+    <div class="card"><h3>📲 Застосунок на телефон</h3>${installHTML()}</div>
     <div class="card"><h3>☁️ Збереження</h3>
       ${G.pid ? `<div class="mute">Код збереження — щоб грати цим відділенням на іншому пристрої. Нікому його не показуй!</div><div class="code" style="margin:6px 0">${code}</div><button class="sm" data-act="copycode">📋 Скопіювати</button>`
         : `<div class="mute">Відділення ще не підключене до онлайну.</div><button class="sm" data-act="register">Підключити онлайн</button>`}
@@ -1752,7 +1914,7 @@ function act(a, el){
   if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina','appscan','proxyok','proxyno','closecell','pickscan','lostsearch','lostpick','open','inspok','inspno','refuse','redirpick','reprint','valpick'].includes(a)) return flowAct(a, el);
   switch(a){
     case 'scanhint': return toast('📟 Затисни штрихкод на посилці, щоб відсканувати');
-    case 'serve': return openServe(id || (G.queue.find(c => !c.by)||{}).id);
+    case 'serve': if (!FLOW) sayNext(); return openServe(id || (G.queue.find(c => !c.by)||{}).id);
     case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
     case 'mclose': if (modalIsFlow && FLOW){ FLOW.hidden = true; closeModal(); dirty = true; } else closeModal(); return;
     case 'startday': return startDay();
@@ -1846,7 +2008,10 @@ function act(a, el){
       toast(`${UPS[k].e} ${UPS[k].n}: рівень ${G.up[k]}!`, 'good'); save(); dirty = true; return;
     }
     case 'rename': { const v = $('#brname').value.trim(); if (v){ G.branch = v.slice(0,40); save(); cloudSave(true); toast('Збережено', 'good'); dirty = true; } return; }
-    case 'sound': G.settings.sound = !G.settings.sound; showSettings(); return;
+    case 'sound': G.settings.sound = !G.settings.sound; if (!G.settings.sound) ambientStop(); showSettings(); return;
+    case 'ambient': G.settings.ambient = G.settings.ambient === false; if (G.settings.ambient) ambientStart(); showSettings(); return;
+    case 'voice': G.settings.voice = G.settings.voice === false; if (G.settings.voice) sayNext(); showSettings(); return;
+    case 'install': return doInstall();
     case 'copycode': { const t = $('.code').textContent; navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Скопійовано', 'good'), () => {}); return; }
     case 'restore': return restoreFromCode($('#rcode').value.trim());
     case 'register': return registerOnline();
@@ -2236,6 +2401,24 @@ async function checkVersion(){
     }
   } catch(e){}
 }
+
+/* ---------- встановлення як застосунок (PWA) ---------- */
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+window.addEventListener('appinstalled', () => { installEvt = null; toast('📲 Гру встановлено! Шукай іконку «Наша Пошта» на екрані.', 'good'); });
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function installHTML(){
+  if (isStandalone()) return '<div class="mute">✅ Гра вже відкрита як застосунок.</div>';
+  if (installEvt) return '<div class="mute">Встанови гру на головний екран — відкриватиметься як окремий застосунок з іконкою.</div><button class="pri" style="margin-top:6px" data-act="install">📲 Встановити на телефон</button>';
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return '<div class="mute">На iPhone: натисни <b>Поділитися</b> ⬆️ у Safari → <b>«На початковий екран»</b>.</div>';
+  return '<div class="mute">Відкрий меню браузера (⋮) → <b>«Встановити застосунок»</b> або <b>«Додати на головний екран»</b>.</div>';
+}
+async function doInstall(){
+  if (!installEvt) return showSettings();
+  installEvt.prompt(); try { await installEvt.userChoice; } catch(e){}
+  installEvt = null; showSettings();
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* ---------- старт ---------- */
 function onboard(){
