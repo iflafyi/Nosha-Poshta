@@ -1,6 +1,6 @@
 // Наша Пошта — service worker: спершу мережа (щоб оновлення гри приходили одразу), без мережі — збережена копія.
-const CACHE = 'np-v1';
-const CORE = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'np-v2';
+const CORE = ['./', './index.html', './config.js', './hall3d.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).catch(() => {}));

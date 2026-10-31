@@ -14,6 +14,8 @@ Owner: GitHub `iflafyi`. Talk to him in Ukrainian. Live site: https://iflafyi.gi
 - `build.py [BUILD_ID]` — stamps `GAME_BUILD` in index.html and writes `version.json` (players get an "update available" bar). Run before every deploy.
 - `config.js` — Supabase URL + publishable key.
 - `sql/schema.sql` — snapshot of the online backend (reference; live DB is the truth).
+- `src/hall3d.js` — 3D hall (Three.js 0.187, imports from 'three'); bundled into `hall3d.js` (repo root, loaded with `defer`, cached by sw.js). Rebuild after editing the source:
+  `npm i --no-save esbuild three@0.187.0` (in a scratch dir) then `NODE_PATH=<dir>/node_modules <dir>/node_modules/.bin/esbuild src/hall3d.js --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=hall3d.js`
 - PWA: `manifest.webmanifest`, `sw.js` (network-first, cache fallback; never caches Supabase or version.json), `icon-192/512.png`, `apple-touch-icon.png`.
 
 ## Deploy
@@ -40,10 +42,12 @@ python3 build.py && git add -A && git commit -m "..." && git push origin main
 - Day events (`rollDay`): `EVENTS` every 7th day (`EV_CYCLE` by day%28) + random sale, eve = queue to door; `WEATHER` flow multiplier; inspection `G.insp` (scores clean/speed/errors, bonus); outage `G.outage` → `manualMode()` (paper journal, no scanner/cards, flashlight overlay `#dark`), `UPS.gen`. Hall dirt `G.dirt` + 🧹 clean; store staff clean when idle.
 - Progression: `G.tasks` (3/day from `TASK_T`, `countTask(k, n, set)`), `ACH` + `checkAch()`, `RANKS`/`G.rank` (promote in «Кар’єра» tab, daily bonus), extra branches `G.others` (snapshots of `BR_KEYS`, switch at night, auto-sim in `simOthers()` at day end), decor `G.decor` (`WALLS`, `DECOR` give patience/sat/tips), staff `traits`/`mood`/`fat` (`staffMul`), 💵 bonus.
 - Online extras: visits (`showPlayer`: hall preview + reviews + 🎁), gifts arrive as parcels named after the player → special client 🙋 → `giftResult`/`applyGift`; weekly contest (`weekParcels`, claim on boot → badge in `G.badges`); announcements (`G.seenAnn`); globals (`NET.gev`, `NET.gweather`, insp/outage flags).
+- 3D hall: `sceneEl()` mounts `Hall3D` into `#scene` (class `s3d`) when `want3D()` (setting `G.settings.s3d`, toggle «🧊 3D зал» in Settings; falls back to the old 2D emoji strip without WebGL). `updScene()` → `Hall3D.sync()`; game data reaches the module only via bridge `window.NP3` (g, act, manual, ev, tab, paused, door, beep, angry, DECOR, WALLS, WEATHER, TIERS). Module draws: counter with 1–4 windows (operators = player + issue/accept staff), clients as figures with emoji heads (path street→door→queue spot/chair/window, leave carrying box/receipt, 😠 if angry), store staff walking between racks, racks/габарит/pile/outgoing boxes from `G.parcels`, upgrades (chairs, coffee, AC, locker, gen, ads, tier plate, scanner), all `DECOR` (cat wanders, tap = meow), dirt decals, rain/snow on the street, outage darkness + torch light, inspector 🕵️, balloons on events. Tap a free client = `act('serve')`; drag = rotate, ＋/－/⟲ buttons. `Hall3D.screenOf(cid)` gives screen coords for Playwright tests (headless needs `--enable-unsafe-swiftshader`).
 - Atmosphere: animated hall `#scene` (persistent element re-attached into `#sceneSlot`, `updScene()` every tick), sounds `sDoor`, `sPrinter`, `sayNext` (speechSynthesis uk), ambient noise (`AMB`), settings toggles sound/ambient/voice.
 
 ## Status / next steps
 - v1 released 2026-10-31 (build 202610311910): full day loop, regulars, staff, upgrades, online (register, cloud save, leaderboard, chat). Owner liked it.
 - v2 released 2026-10-31 in 5 deploys: all 22 ideas from `IDEAS.md` implemented (counter situations + scanner, events/weather/inspection/outage, tasks/achievements/career/branches/decor/staff traits, visits/gifts/weekly contest/dev panel, animated hall/sounds/PWA).
-- Next: ask the owner for feedback and real situations from his operator job to turn into mechanics; balance (event frequency, rank requirements, branch income) may need tuning after he plays.
+- v3 (2026-10-31): 3D hall (see above).
+- Next: ask the owner how the 3D hall feels on his phone (performance, camera); ask the owner for feedback and real situations from his operator job to turn into mechanics; balance (event frequency, rank requirements, branch income) may need tuning after he plays.
 - Test locally: `python3 -m http.server` in the repo + Playwright; block `supabase.co` in tests (or delete test players from `np_players`/`np_chat` afterwards).

@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Наша Пошта">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="config.js"></script>
+<script src="hall3d.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <style>
 :root{
@@ -186,6 +187,12 @@ main{padding:4px 10px}
 .spr .mood{position:absolute;left:50%;top:-14px;transform:translateX(-50%);font-size:13px}
 .spr.reg .face{filter:drop-shadow(0 0 3px #e89a00)}
 @keyframes bob{50%{transform:translateY(-4px)}}
+#scene.s3d{height:clamp(250px,46vw,380px);background:#2b2f36}
+#scene .h3d{display:block;width:100%;height:100%;cursor:grab}
+#scene .h3dctl{position:absolute;right:6px;bottom:6px;display:flex;gap:4px}
+#scene .h3dctl button{width:32px;height:32px;padding:0;border-radius:8px;border:1px solid #ffffff55;background:#00000066;color:#fff;font-size:17px;line-height:1}
+#scene .h3dhint{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:#000000a0;color:#fff;font-size:12px;padding:4px 10px;border-radius:10px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;transition:opacity .6s}
+#scene .h3dhint[hidden]{display:block;opacity:0}
 .visit{margin-top:8px}.visit .vq{display:flex;gap:6px;font-size:28px;justify-content:center;min-height:36px}.visit .vw{display:flex;gap:10px;justify-content:center;font-size:24px;flex-wrap:wrap}
 .decor{display:flex;gap:6px;font-size:24px;justify-content:flex-end;margin:-4px 0 -6px;flex-wrap:wrap}
 .traits{display:flex;gap:4px;flex-wrap:wrap;margin:3px 0}.traits span{background:var(--blue2);color:var(--blue);border-radius:8px;padding:1px 6px;font-size:12px;font-weight:600}
@@ -231,7 +238,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610312011; // ставиться build.py
+const GAME_BUILD = 202610312031; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -1050,7 +1057,7 @@ function cleanHall(){
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null; pullGifts();
   rollDay(); genTasks();
-  SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.seen = false;
+  SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.seen = false; if (SCENE.is3d && window.Hall3D) Hall3D.reset();
   G.staff.forEach(s => { s.bonusDay = 0; });
   if (G.candDay < G.day || !G.cand.length) refreshCand();
   truckArrive('m');
@@ -1135,13 +1142,28 @@ function tick(){
 }
 
 /* ---------- анімований зал ---------- */
-const SCENE = {el:null, spr:new Map(), angry:new Set(), seen:false};
+const SCENE = {el:null, spr:new Map(), angry:new Set(), seen:false, is3d:false};
+// міст для 3D-залу (hall3d.js, збирається з src/hall3d.js)
+window.NP3 = {g: () => G, act: (a, el) => act(a, el), manual: () => manualMode(), ev: () => curEvent(), tab: () => TAB, paused: () => paused,
+  door: () => sDoor(), beep: (...a) => beep(...a), angry: SCENE.angry, DECOR, WALLS, WEATHER, TIERS};
+function want3D(){ return !!(G && G.settings.s3d !== false && window.Hall3D && Hall3D.ok()); }
 function sceneEl(){
   if (!SCENE.el){
     SCENE.el = document.createElement('div'); SCENE.el.id = 'scene';
-    SCENE.el.innerHTML = '<div class="wins"></div><div class="deco"></div><div class="door">🚪</div>';
+    SCENE.is3d = want3D();
+    if (SCENE.is3d){
+      SCENE.el.className = 's3d';
+      try { Hall3D.mount(SCENE.el); } catch (e){ console.warn('3D зал не запустився', e); SCENE.is3d = false; SCENE.el.className = ''; G.settings.s3d = false; }
+    }
+    if (!SCENE.is3d) SCENE.el.innerHTML = '<div class="wins"></div><div class="deco"></div><div class="door">🚪</div>';
   }
   return SCENE.el;
+}
+function sceneRebuild(){ // перемикання 2D ↔ 3D
+  const old = SCENE.el;
+  if (SCENE.is3d && window.Hall3D) Hall3D.dispose();
+  SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.wh = SCENE.dh = null; SCENE.el = null; SCENE.seen = false;
+  if (old && old.isConnected) old.replaceWith(sceneEl());
 }
 function scenePos(c, i){
   const W = SCENE.el.clientWidth || 600;
@@ -1160,6 +1182,8 @@ function scenePos(c, i){
 }
 function updScene(){
   if (!SCENE.el || !SCENE.el.isConnected || !G || G.phase !== 'day') return;
+  if (SCENE.is3d !== want3D()) sceneRebuild();
+  if (SCENE.is3d){ try { Hall3D.sync(); } catch (e){ console.warn(e); } return; }
   const W = SCENE.el.clientWidth || 600;
   SCENE.el.style.setProperty('--wallc', (WALLS[G.decor.wall] || WALLS.cream)[1]);
   const wins = []; const busy = G.staff.filter(s => s.cl);
@@ -1897,7 +1921,8 @@ function showSettings(){
       <div class="mute" style="margin-top:6px">Нікнейм: <b>${esc(G.nick)}</b></div></div>
     <div class="card"><h3>🔊 Звук</h3><div class="row"><button data-act="sound">${G.settings.sound ? '🔊 Звук увімкнено' : '🔇 Звук вимкнено'}</button>
       <button data-act="ambient">${G.settings.ambient !== false ? '🏢 Фоновий шум: так' : '🏢 Фоновий шум: ні'}</button>
-      <button data-act="voice">${G.settings.voice !== false ? '🗣️ «Наступний!»: так' : '🗣️ «Наступний!»: ні'}</button></div></div>
+      <button data-act="voice">${G.settings.voice !== false ? '🗣️ «Наступний!»: так' : '🗣️ «Наступний!»: ні'}</button>
+      <button data-act="s3d">${G.settings.s3d !== false ? '🧊 3D зал: так' : '🧊 3D зал: ні (простий)'}</button></div></div>
     <div class="card"><h3>📲 Застосунок на телефон</h3>${installHTML()}</div>
     <div class="card"><h3>☁️ Збереження</h3>
       ${G.pid ? `<div class="mute">Код збереження — щоб грати цим відділенням на іншому пристрої. Нікому його не показуй!</div><div class="code" style="margin:6px 0">${code}</div><button class="sm" data-act="copycode">📋 Скопіювати</button>`
@@ -2011,6 +2036,7 @@ function act(a, el){
     case 'sound': G.settings.sound = !G.settings.sound; if (!G.settings.sound) ambientStop(); showSettings(); return;
     case 'ambient': G.settings.ambient = G.settings.ambient === false; if (G.settings.ambient) ambientStart(); showSettings(); return;
     case 'voice': G.settings.voice = G.settings.voice === false; if (G.settings.voice) sayNext(); showSettings(); return;
+    case 's3d': G.settings.s3d = G.settings.s3d === false; sceneRebuild(); save(); showSettings(); return;
     case 'install': return doInstall();
     case 'copycode': { const t = $('.code').textContent; navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Скопійовано', 'good'), () => {}); return; }
     case 'restore': return restoreFromCode($('#rcode').value.trim());
