@@ -165,6 +165,27 @@ main{padding:4px 10px}
 .hearts{color:var(--red);font-size:12px}
 .code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
 .guide li{margin-bottom:6px}
+
+/* сканер штрихкодів */
+.bc{position:relative;display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #bbb;border-radius:6px;padding:4px 6px 2px;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none;overflow:hidden}
+.bc .bars{display:flex;align-items:stretch;height:30px;gap:1px}
+.bc .bars i{display:block;background:#111}
+.bc .bn{font:10px ui-monospace,monospace;color:#333;letter-spacing:.5px}
+.bc::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:#ff1f1f;box-shadow:0 0 8px #ff1f1f;opacity:0}
+.bc.scanning::after{opacity:1;animation:laser .35s linear infinite}
+.bc.scanned{outline:3px solid var(--green)}
+@keyframes laser{0%{top:8%}50%{top:88%}100%{top:8%}}
+.parcel .bc{margin-top:3px;padding:2px 3px 0}.parcel .bc .bars{height:16px}.parcel .bc .bn{font-size:8px}
+.cellbox{background:#f6efe5;border:2px solid var(--shelf);border-radius:10px;padding:10px;margin:8px 0}
+.phonebox{display:inline-block;background:#222;border-radius:18px;padding:10px 8px;margin:4px 0 10px 54px}
+.phonebox .scr{background:#fff;border-radius:10px;padding:8px;text-align:center;font-size:12px}
+.doc{background:#fffdf3;border:1px solid #d9cfae;border-radius:8px;padding:10px;font-family:Georgia,serif;font-size:14px;margin-bottom:10px;box-shadow:2px 2px 0 #0001}
+.doc .stamp{display:inline-block;border:2px solid #2c6fbb;color:#2c6fbb;border-radius:50%;padding:6px 8px;font-size:10px;transform:rotate(-12deg);font-weight:700}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.sgrid button{background:#d8b384;border:1px solid #9c7646;padding:8px 2px;font-size:12px;color:#3d2a15}
+.sgrid button .pe{font-size:22px;display:block}
+.sgrid button.no{opacity:.35}
+.opened{font-size:46px;text-align:center;padding:6px}
 </style>
 </head>
 <body>
@@ -178,7 +199,7 @@ main{padding:4px 10px}
 <div id="updbar" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610311910; // ставиться build.py
+const GAME_BUILD = 202610311956; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -201,25 +222,25 @@ const SIZE_N = ['Конверт','S','M','L','XL'];
 const SIZE_CM = ['≈ 30×21 см, пласке','≈ 25×20×10 см','≈ 40×30×20 см','≈ 60×40×40 см','більше 60 см'];
 const ITEMS = [
   {n:'Документи', e:'📄', s:0, w:[0.1,0.4]},
-  {n:'Телефон', e:'📱', s:1, w:[0.3,0.8], f:1},
+  {n:'Телефон', e:'📱', s:1, w:[0.3,0.8], f:1, v:[3000,15000]},
   {n:'Книжки', e:'📚', s:2, w:[1,4]},
   {n:'Кросівки', e:'👟', s:2, w:[1,2]},
   {n:'Одяг', e:'👕', s:1, w:[0.3,1.5]},
   {n:'Банки з варенням', e:'🫙', s:2, w:[2,5], f:1},
-  {n:'Ноутбук', e:'💻', s:2, w:[2,3.5], f:1},
+  {n:'Ноутбук', e:'💻', s:2, w:[2,3.5], f:1, v:[8000,40000]},
   {n:'Іграшки', e:'🧸', s:2, w:[0.5,2]},
   {n:'Розсада', e:'🌱', s:2, w:[1,3], f:1},
   {n:'Мед', e:'🍯', s:1, w:[1,3], f:1},
-  {n:'Запчастини', e:'⚙️', s:3, w:[5,15]},
-  {n:'Шини', e:'🛞', s:4, w:[20,40], packed:1},
-  {n:'Мікрохвильовка', e:'📦', s:3, w:[10,14], f:1, packed:1},
-  {n:'Велосипед', e:'🚲', s:4, w:[12,18], packed:1},
+  {n:'Запчастини', e:'⚙️', s:3, w:[5,15], v:[1000,8000]},
+  {n:'Шини', e:'🛞', s:4, w:[20,40], packed:1, v:[4000,16000]},
+  {n:'Мікрохвильовка', e:'📦', s:3, w:[10,14], f:1, packed:1, v:[2000,5000]},
+  {n:'Велосипед', e:'🚲', s:4, w:[12,18], packed:1, v:[5000,20000]},
   {n:'Косметика', e:'💄', s:1, w:[0.3,1], f:1},
   {n:'Посуд', e:'🍽️', s:2, w:[2,6], f:1},
-  {n:'Інструменти', e:'🔧', s:3, w:[4,10]},
+  {n:'Інструменти', e:'🔧', s:3, w:[4,10], v:[800,5000]},
   {n:'Подарунок', e:'🎁', s:1, w:[0.5,2]},
   {n:'Каструля', e:'🍲', s:2, w:[1.5,3]},
-  {n:'Картина', e:'🖼️', s:3, w:[2,5], f:1},
+  {n:'Картина', e:'🖼️', s:3, w:[2,5], f:1, v:[1000,10000]},
   {n:'Чохол для телефону', e:'📲', s:0, w:[0.05,0.2]},
   {n:'Кава в зернах', e:'☕', s:1, w:[0.5,1.5]},
 ];
@@ -315,6 +336,8 @@ const errCh = s => 0.12 - s.lvl*0.02;
 const trainCost = s => 400*s.lvl;
 const sendPrice = (w, f) => 60 + Math.round(15*w) + (f ? 20 : 0);
 const smallCell = s => s <= 2;
+const valFee = v => v ? Math.max(5, Math.round(v*0.005)) : 0;   // страховка за оголошену вартість
+const REDIR_FEE = 45;
 
 function cellsList(){
   const small = [], big = [];
@@ -338,6 +361,8 @@ function targetCell(p){
   return opts.length ? pick(opts) : null;
 }
 
+function countTask(k, n){ /* щоденні завдання — див. нижче */ }
+
 /* ---------- звук ---------- */
 let AC = null;
 function beep(f=1800, d=0.08, type='square', v=0.05){
@@ -355,6 +380,36 @@ const sScan = () => beep(1900, 0.09);
 const sErr = () => beep(180, 0.25, 'sawtooth', 0.06);
 const sCash = () => { beep(1320, 0.08, 'triangle', 0.08); setTimeout(() => beep(1760, 0.15, 'triangle', 0.08), 90); };
 const sBell = () => { beep(880, 0.2, 'sine', 0.06); };
+
+/* ---------- сканер штрихкодів ---------- */
+function barsFor(code){
+  const d = String(code).replace(/\D/g,'') || '0';
+  let h = '<i style="width:2px"></i><i style="width:1px"></i>';
+  for (let k=0;k<d.length;k++){ const n = +d[k]; h += `<i style="width:${1+(n%3)}px;margin-right:${1+((n*7)%3)}px"></i>`; }
+  return h + '<i style="width:1px"></i><i style="width:2px"></i>';
+}
+// затисни (або наведи мишку) на штрихкод ~0,35 с — «пік»
+function bcHTML(code, scanAct, v, small){
+  return `<div class="bc" data-scan="${scanAct}" data-id="${esc(v)}" data-v="${esc(v)}"><div class="bars">${barsFor(code)}</div><div class="bn">${small ? '…' + String(code).slice(-6) : esc(code)}</div></div>`;
+}
+const SCAN = {el:null, t:0, last:0};
+function scanStart(el){
+  if (SCAN.el === el) return;
+  scanStop();
+  SCAN.el = el; el.classList.add('scanning');
+  const ms = (G && G.up.scanner >= 1) ? 280 : 380;
+  SCAN.t = setTimeout(() => {
+    const e = SCAN.el; scanStop(); if (!e || !e.isConnected) return;
+    e.classList.add('scanned'); sScan(); SCAN.last = performance.now();
+    act(e.dataset.scan, e);
+  }, ms);
+}
+function scanStop(){ if (SCAN.el) SCAN.el.classList.remove('scanning'); clearTimeout(SCAN.t); SCAN.el = null; }
+document.addEventListener('pointerdown', e => { const b = e.target.closest('.bc'); if (b){ e.preventDefault(); scanStart(b); } });
+document.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const b = e.target.closest('.bc'); if (b) scanStart(b); });
+document.addEventListener('pointerout', e => { const b = e.target.closest('.bc'); if (b && SCAN.el === b && !b.contains(e.relatedTarget)) scanStop(); });
+document.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') scanStop(); });
+document.addEventListener('pointercancel', scanStop);
 
 /* ---------- тости ---------- */
 function toast(t, cls=''){
@@ -380,7 +435,7 @@ function makeParcel(opts={}){
   const it = opts.item || pick(ITEMS);
   const p = {id:G.nid++, ttn:ttn(), item:it.n, e:it.e, s:it.s, w:+rnd(it.w[0], it.w[1]).toFixed(1), f:it.f?1:0,
     cod: Math.random() < 0.4 ? ri(2,40)*25 : 0, phone: opts.phone || phone(), name: opts.name || person().name,
-    city: pick(CITIES), state: opts.state || 'truck', cell:null, reg: opts.reg || null, unl:0, inDay:0, inT:0};
+    city: pick(CITIES), from: pick(CITIES), state: opts.state || 'truck', cell:null, reg: opts.reg || null, unl:0, inDay:0, inT:0};
   G.parcels.push(p);
   return p;
 }
@@ -462,11 +517,14 @@ function spawnClient(force){
     c.phone = p0.phone; c.pids = group.map(p => p.id);
     group.forEach(p => p.res = c.id);
     c.hi = reg ? reg.hi : pick(GET_HI);
+    c.app = Math.random() < 0.4;
+    if (!reg) specialGet(c, p0, group);
+    else if (Math.random() < 0.06) p0.lost = 1;
   } else {
     const n = reg && reg.multi ? reg.multi : (Math.random() < 0.12 ? 2 : 1);
     for (let i=0;i<n;i++){
       const it = reg ? ITEM(pick(reg.items)) : pick(ITEMS);
-      c.items.push({item:it.n, e:it.e, s:it.s, f:it.f?1:0, packed:it.packed?1:0, w:+rnd(it.w[0], it.w[1]).toFixed(1), city:pick(CITIES)});
+      c.items.push({item:it.n, e:it.e, s:it.s, f:it.f?1:0, packed:it.packed?1:0, w:+rnd(it.w[0], it.w[1]).toFixed(1), city:pick(CITIES), val: it.v ? Math.round(rnd(it.v[0], it.v[1])/100)*100 : 0});
     }
     c.hi = reg ? reg.hi : pick(SEND_HI);
   }
@@ -476,6 +534,32 @@ function spawnClient(force){
   }
   G.queue.push(c); G.stats.clients++;
   dirty = true;
+}
+const RELS = ['мами','тата','сестри','брата','бабусі','дідуся','сусідки','чоловіка','дружини'];
+const WRONG_IN = ['цеглина 🧱','старі шкарпетки 🧦','зовсім інший товар 📦','порожня коробка 🫥','китайська підробка 🎭'];
+function specialGet(c, p0, group){
+  const r = Math.random();
+  const codP = group.find(p => p.cod);
+  if (codP && r < 0.13){
+    c.inspect = {pid:codP.id, bad: Math.random() < 0.55 ? pick(['broken','wrong']) : null, wrongIn: pick(WRONG_IN)};
+    c.hi = pick(['Добрий день! Можна спершу подивитись, що там, а потім оплачу?','Вітаю! Хочу розкрити посилку перед оплатою.','Здрастуйте, я по посилку, але спершу огляну, добре?']);
+  } else if (r < 0.24){
+    const type = pick(['city','person','back']);
+    let city = pick(CITIES.filter(x => x !== p0.city));
+    c.redir = {type, city, name: person().name, from: p0.from};
+    c.hi = type === 'city' ? `Добрий день! Я переїхав(ла), можна переслати посилку в <b>${city}</b>?`
+      : type === 'person' ? `Вітаю! Хочу переоформити посилку на іншу людину — <b>${c.redir.name}</b>, вона забере в місті ${city}.`
+      : 'Здрастуйте! Я передумав(ла), поверніть цю посилку відправнику, будь ласка.';
+  } else if (r < 0.35){
+    const ok = Math.random() < 0.55;
+    const pp = person();
+    c.name = pp.name; c.av = ok ? pp.av : pick(['🕶️', pp.av, pp.av]);
+    c.proxy = {rel: pick(RELS), ok, kind: ok ? pick(['doc','app']) : pick(['noDoc','wrongName','expired']), other: person().name};
+    c.hi = `Добрий день! Я по посилку для ${c.proxy.rel}.`;
+    c.app = false;
+  } else if (r < 0.43){
+    p0.lost = 1;
+  }
 }
 function removeClient(c){
   G.queue = G.queue.filter(x => x.id !== c.id);
@@ -557,15 +641,23 @@ function staffFinish(s){
   const err = Math.random() < errCh(s);
   let money = 0, n = 0;
   if (c.kind === 'get'){
-    const ps = G.parcels.filter(p => c.pids.includes(p.id));
-    n = ps.length;
-    money = ps.reduce((a,p) => a + 15 + Math.round(p.cod*0.02), 0);
-    G.parcels = G.parcels.filter(p => !c.pids.includes(p.id));
-    G.stats.issued += n; G.today.issued += n;
+    let ps = G.parcels.filter(p => c.pids.includes(p.id));
+    ps.forEach(p => { p.lost = 0; });
+    if (c.redir){ ps.forEach(p => redirectParcel(p, c.redir)); money = c.redir.type === 'back' ? 10 : 55; n = ps.length; ps = []; }
+    if (c.proxy && !c.proxy.ok){
+      if (Math.random() < 0.45 + s.lvl*0.1){ removeClient(c); toast(`🚫 ${esc(s.name)} не віддав(ла) посилку шахраю`, 'good'); addXp(5); return; }
+      G.rating = clamp(G.rating - 0.15, 1, 5); toast(`😱 ${esc(s.name)} видав(ла) посилку шахраю! Рейтинг ↓`, 'bad');
+    }
+    if (c.inspect && c.inspect.bad){ const bp = ps.find(p => p.id === c.inspect.pid); if (bp){ returnParcel(bp); ps = ps.filter(p => p !== bp); money += 15; } }
+    n += ps.length;
+    money += ps.reduce((a,p) => a + 15 + Math.round(p.cod*0.02), 0);
+    G.parcels = G.parcels.filter(p => !ps.includes(p));
+    G.stats.issued += ps.length; G.today.issued += ps.length;
+    n = Math.max(n, 1);
   } else {
     for (const it of c.items){
       const pk = PACK.find(x => x.k === (it.packed ? 9 : it.s)) || PACK[0];
-      money += sendPrice(it.w, it.f) + (it.s >= 4 ? 0 : pk.price);
+      money += sendPrice(it.w, it.f) + (it.s >= 4 ? 0 : pk.price) + valFee(it.val);
       const p = makeParcel({item:ITEM(it.item), state:'outgoing'}); p.w = it.w; p.city = it.city;
       n++;
     }
@@ -590,6 +682,13 @@ function storeAction(s){
     const o = G.parcels.find(p => p.state === 'outgoing');
     if (o){ o.state = 'loaded'; dirty = true; }
   }
+}
+function returnParcel(p){ p.state = 'outgoing'; p.city = p.from || pick(CITIES); p.ret = 1; p.cell = null; p.res = null; p.lost = 0; dirty = true; }
+function redirectParcel(p, rd){
+  if (rd.type === 'back') return returnParcel(p);
+  p.state = 'outgoing'; p.city = rd.city; p.redir = 1; p.cell = null; p.res = null; p.lost = 0; p.ttn = ttn();
+  if (rd.type === 'person') p.name = rd.name;
+  dirty = true;
 }
 function placeParcel(p, cell, byStaff){
   p.state = 'cell'; p.cell = cell; p.inDay = G.day; p.inT = G.time; p.target = null;
@@ -782,26 +881,27 @@ function rackHTML(mode, needCells=[], pickedCells=[]){
   h += `<div class="rack big"><div class="rt">Габарит</div><div class="cells">${big.map(id => cellBtn(id,2)).join('')}</div></div></div>`;
   return h;
 }
-function parcelHTML(p, act){
+function parcelHTML(p, act, scanAct){
   return `<div class="parcel s${p.s} ${G.hand===p.id?'sel':''}" data-act="${act}" data-id="${p.id}">
-    <div class="pe">${p.e}</div><div class="tag">${SIZE_N[p.s]} · ${p.w} кг</div>${p.f?'<div class="tag fr">⚠ КРИХКЕ</div>':''}<div class="tag">…${String(p.ttn).slice(-4)}</div></div>`;
+    <div class="pe">${p.e}</div><div class="tag">${SIZE_N[p.s]} · ${p.w} кг</div>${p.f?'<div class="tag fr">⚠ КРИХКЕ</div>':''}${p.gift?'<div class="tag">🎁 ПОДАРУНОК</div>':''}${scanAct ? bcHTML(p.ttn, scanAct, p.id, true) : `<div class="tag">…${String(p.ttn).slice(-4)}</div>`}</div>`;
 }
+function outTag(p){ return p.ret ? '<div class="tag fr">🔙 повернення</div>' : p.redir ? '<div class="tag">↪ переадресація</div>' : ''; }
 function viewStore(){
   const pile = G.parcels.filter(p => p.state === 'pile');
   const hand = G.parcels.find(p => p.id === G.hand);
   const out = G.parcels.filter(p => p.state === 'outgoing' || p.state === 'loaded');
   const inCells = G.parcels.filter(p => p.state === 'cell').length;
   const term = hand ? `📟 ТТН <b>${hand.ttn}</b> · ${SIZE_N[hand.s]} · ${hand.w} кг<br>➡ Розмістити в комірку: <b style="font-size:18px">${hand.target || 'НЕМАЄ МІСЦЯ'}</b>`
-    : pile.length ? '📟 Візьми посилку з розбору, щоб відсканувати її' : '📟 Розбір порожній. Чекай на машину або видавай посилки 👍';
+    : pile.length ? '📟 Відскануй посилку з розбору: затисни палець (або наведи мишку) на штрихкод' : '📟 Розбір порожній. Чекай на машину або видавай посилки 👍';
   return `<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
       <div class="terminal">${term}</div>
-      <div class="pile">${pile.map(p => parcelHTML(p, 'take')).join('') || '<span class="mute">Порожньо</span>'}</div></div>
+      <div class="pile">${pile.map(p => parcelHTML(p, G.hand===p.id ? 'take' : 'scanhint', G.hand===p.id ? '' : 'take')).join('') || '<span class="mute">Порожньо</span>'}</div></div>
     <div class="card"><h3>🗄️ Комірки <span class="mute">(${inCells} посилок)</span></h3>
       <div class="mute" style="margin-bottom:8px">${hand ? 'Натисни на потрібну комірку.' : 'Натисни на комірку, щоб подивитись, що в ній.'} ■ = посилка в комірці.</div>
       ${rackHTML('place')}</div>
     <div class="card"><h3>📤 Відправлення <span class="mute">(${out.length})</span></h3>
       <div class="mute">Прийняті посилки чекають на вечірню машину (18:00). Завантажити їх можна на вкладці «Рампа».</div>
-      <div class="pile" style="margin-top:6px">${out.map(p => `<div class="parcel s${p.s}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${p.state==='loaded'?'<div class="tag">✅ в машині</div>':''}</div>`).join('')}</div></div>`;
+      <div class="pile" style="margin-top:6px">${out.map(p => `<div class="parcel s${p.s}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${outTag(p)}${p.state==='loaded'?'<div class="tag">✅ в машині</div>':''}</div>`).join('')}</div></div>`;
 }
 function viewRamp(){
   if (G.phase === 'night') return `<div class="card bigstart"><div class="e">🌙</div><p class="mute">Машини приїдуть зранку о 08:00.</p></div>`;
@@ -818,7 +918,7 @@ function viewRamp(){
   const out = G.parcels.filter(p => p.state === 'outgoing');
   const loaded = G.parcels.filter(p => p.state === 'loaded');
   return `<div class="truck"><div class="truckcab"><span class="te">🚛</span><div><b>Вечірня машина за відправленнями</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span>. Натискай на посилки, щоб завантажити.</div></div></div>
-    <div class="mute">На відправку:</div><div class="pile" style="margin:6px 0 10px">${out.map(p => `<div class="parcel s${p.s}" data-act="load" data-id="${p.id}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div></div>`).join('') || '<span class="mute">Все завантажено ✅</span>'}</div>
+    <div class="mute">На відправку:</div><div class="pile" style="margin:6px 0 10px">${out.map(p => `<div class="parcel s${p.s}" data-act="load" data-id="${p.id}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${outTag(p)}</div>`).join('') || '<span class="mute">Все завантажено ✅</span>'}</div>
     <div class="truckbody">${loaded.map(p => `<div class="box s${p.s}">${p.e}<span>${p.city.slice(0,8)}</span></div>`).join('')}</div></div>`;
 }
 function viewStaff(){
@@ -895,24 +995,80 @@ function renderFlow(){
   let body = '';
   if (c.kind === 'get'){
     const ps = G.parcels.filter(p => c.pids.includes(p.id));
-    const cod = ps.reduce((a,p) => a + p.cod, 0);
-    const steps = ['Пошук','Комірка', ...(cod ? ['Оплата'] : []), 'Видача'];
-    const si = {phone:0, cells:1, pay:2, give: cod ? 3 : 2}[FLOW.step];
-    body += stepsBar(steps, si);
+    const keys = getSteps(c);
+    const LBL = {phone:'Пошук', proxy:'Довіреність', cells:'Комірка', inspect:'Огляд', redir:'Переадресація', pay:'Оплата', give:'Видача', reprint:'Нова ТТН'};
+    const curKey = {search:'cells', refuse:'inspect'}[FLOW.step] || FLOW.step;
+    body += stepsBar(keys.map(k => LBL[k]), keys.indexOf(curKey));
     if (FLOW.step === 'phone'){
-      const rows = G.up.scanner >= 2 ? [c.phone] : FLOW.rows;
       const pnum = c.reg === 'nina' && !FLOW.ninaOk ? null : c.phone;
-      body += speaker(c, `${esc(c.hi)}${pnum ? `<br>Номер: <b style="font-size:17px">${pnum}</b>` : ''}`);
-      if (!pnum) body += `<button data-act="nina">⏳ Зачекати, поки знайде номер</button>`;
-      else body += `<div class="terminal">📟 Пошук посилки за номером телефону${G.up.scanner>=2?' · 🔎 знайдено автоматично':''}:<div style="margin-top:6px">${rows.map(ph => {
-          const n = G.parcels.filter(p => p.state==='cell' && p.phone===ph).length;
-          return `<div class="trow" data-act="findrow" data-v="${ph}"><span>📞 ${ph}</span><span>${n} пос.</span></div>`; }).join('')}</div></div>`;
+      if (c.app && pnum && !manualMode()){
+        body += speaker(c, `${c.hi}<br>Ось код у застосунку 📱`);
+        body += `<div class="phonebox"><div class="scr"><b>Наша Пошта</b><br>Посилка готова до видачі<br>${bcHTML(ps[0] ? ps[0].ttn : c.phone, 'appscan', c.id)}</div></div>
+          <div class="mute">Затисни штрихкод на екрані телефону, щоб відсканувати.</div>`;
+      } else {
+        const rows = G.up.scanner >= 2 && !manualMode() ? [c.phone] : FLOW.rows;
+        body += speaker(c, `${c.hi}${pnum ? `<br>Номер: <b style="font-size:17px">${pnum}</b>` : ''}`);
+        if (!pnum) body += `<button data-act="nina">⏳ Зачекати, поки знайде номер</button>`;
+        else body += `<div class="terminal">${manualMode() ? '🔦 Термінал не працює — шукай у паперовому журналі:' : `📟 Пошук посилки за номером телефону${G.up.scanner>=2?' · 🔎 знайдено автоматично':''}:`}<div style="margin-top:6px">${rows.map(ph => {
+            const n = G.parcels.filter(p => p.state==='cell' && p.phone===ph).length;
+            return `<div class="trow" data-act="findrow" data-v="${ph}"><span>📞 ${ph}</span><span>${n} пос.</span></div>`; }).join('')}</div></div>`;
+      }
+    } else if (FLOW.step === 'proxy'){
+      body += proxyHTML(c, ps[0]);
     } else if (FLOW.step === 'cells'){
       const need = ps.map(p => p.cell);
-      body += `<div class="terminal">📟 Знайдено ${ps.length} пос. · Принеси з комірок: ${ps.map(p => `<b>${FLOW.picked.includes(p.id) ? '✅' : ''}${p.cell}</b>`).join(', ')}</div>`;
-      body += rackHTML('fetch', need, ps.filter(p => FLOW.picked.includes(p.id)).map(p => p.cell));
+      body += `<div class="terminal">📟 Знайдено ${ps.length} пос. · Принеси з комірок: ${ps.map(p => `<b>${FLOW.picked.includes(p.id) ? '✅' : ''}${p.cell}</b> (…${String(p.ttn).slice(-4)})`).join(', ')}</div>`;
+      if (FLOW.openCell){
+        const inCell = G.parcels.filter(p => p.state === 'cell' && p.cell === FLOW.openCell && !p.lost && !FLOW.picked.includes(p.id));
+        const lostHere = ps.find(p => p.lost && p.cell === FLOW.openCell);
+        body += `<div class="cellbox"><b>🗄️ Комірка ${FLOW.openCell}</b> <span class="mute">— відскануй потрібну посилку</span>
+          <div class="pile" style="margin-top:6px">${inCell.map(p => parcelHTML(p, '', 'pickscan')).join('') || '<span class="mute">Порожньо</span>'}</div>
+          ${lostHere ? `<div class="terminal" style="margin-top:8px">⚠ За системою тут має бути посилка …${String(lostHere.ttn).slice(-4)}, але її немає!</div><button class="pri" data-act="lostsearch">🔍 Шукати на складі</button>` : ''}
+          <div style="margin-top:8px"><button class="sm ghost" data-act="closecell">← До стелажів</button></div></div>`;
+      } else body += rackHTML('fetch', need, ps.filter(p => FLOW.picked.includes(p.id)).map(p => p.cell));
+    } else if (FLOW.step === 'search'){
+      const lp = ps.find(p => p.lost);
+      if (!FLOW.grid){
+        const fake = shuffle(ITEMS.slice()).slice(0, 11).map(it => ({e:it.e, l4:String(ri(1000,9999))}));
+        FLOW.grid = shuffle([{e:lp.e, l4:String(lp.ttn).slice(-4), ok:1}, ...fake]);
+      }
+      body += `<div class="terminal">🔍 Посилка десь на складі. Шукай ТТН що закінчується на <b style="font-size:18px">${String(lp.ttn).slice(-4)}</b> (${lp.e} ${lp.item})</div>
+        <div class="sgrid">${FLOW.grid.map((g,i) => `<button class="${g.no?'no':''}" data-act="lostpick" data-v="${i}" ${g.no?'disabled':''}><span class="pe">${g.e}</span>…${g.l4}</button>`).join('')}</div>`;
+    } else if (FLOW.step === 'inspect'){
+      const ip = ps.find(p => p.id === c.inspect.pid) || ps[0];
+      if (!FLOW.opened){
+        body += speaker(c, 'Можна я подивлюсь, що всередині, перед тим як платити?');
+        body += `<div class="itemcard"><span class="ie">📦</span><div><b>${ip.item}</b><div class="mute">Накладений платіж: ${ip.cod} ₴</div></div></div>
+          <button class="pri" style="width:100%" data-act="open">✂️ Розкрити посилку разом з клієнтом</button>`;
+      } else {
+        const b = c.inspect.bad;
+        body += `<div class="opened">${b === 'broken' ? ip.e + '💥' : b === 'wrong' ? c.inspect.wrongIn.split(' ').pop() : ip.e + '✨'}</div>`;
+        body += `<div class="terminal">${b === 'broken' ? `💥 ${ip.item}: пошкоджено при перевезенні` : b === 'wrong' ? `❓ Замість «${ip.item.toLowerCase()}» всередині: ${c.inspect.wrongIn}` : `✅ ${ip.item}: ціле, відповідає опису`}</div>`;
+        body += speaker(c, b === 'broken' ? 'Та воно ж розбите! Я за це платити не буду.' : b === 'wrong' ? 'Це взагалі не те, що я замовляв(ла)! Не беру.' : 'Все добре, беру 👍');
+        body += `<div class="opts"><button data-act="inspok">💳 Все гаразд — до оплати</button><button data-act="inspno">🔙 Оформити відмову</button></div>`;
+      }
+    } else if (FLOW.step === 'refuse'){
+      const ip = G.parcels.find(p => p.id === c.inspect.pid);
+      body += `<div class="doc"><b>АКТ ПРО ВІДМОВУ ВІД ОТРИМАННЯ</b><br>ТТН ${ip ? ip.ttn : ''}<br>Причина: ${c.inspect.bad === 'broken' ? 'пошкодження вмісту' : 'вміст не відповідає замовленню'}<br>Повернення відправнику: <b>${ip ? ip.from : ''}</b><br>Оплату не стягнуто. <span class="stamp">НП ✓</span></div>
+        <button class="pri" style="width:100%" data-act="refuse">🖨️ Надрукувати акт і повернути відправнику</button>`;
+    } else if (FLOW.step === 'redir'){
+      const rd = c.redir;
+      body += speaker(c, c.hi);
+      if (!FLOW.rdOpts){
+        FLOW.rdOpts = rd.type === 'city' ? shuffle([rd.city, ...shuffle(CITIES.filter(x => x !== rd.city)).slice(0,3)]).map(x => [x, '📍 ' + x])
+          : rd.type === 'person' ? shuffle([rd.name, person().name, person().name, person().name]).map(x => [x, '👤 ' + x])
+          : shuffle([['back', `🔙 Повернути відправнику (${rd.from})`], ['city', '↪ Переадресувати в інше місто'], ['give', '📦 Просто видати']]);
+      }
+      body += `<div class="terminal">📟 ${rd.type === 'back' ? 'Оберіть операцію з посилкою:' : rd.type === 'city' ? `Переадресація · платна послуга ${REDIR_FEE} ₴ · нове місто:` : `Зміна отримувача · ${REDIR_FEE} ₴ · місто ${rd.city} · новий отримувач:`}</div>
+        <div class="opts">${FLOW.rdOpts.map(([v,n]) => `<button data-act="redirpick" data-v="${esc(v)}">${n}</button>`).join('')}</div>`;
     } else if (FLOW.step === 'pay'){
-      body += payHTML(c, cod, `Накладений платіж за ${ps.length} пос.`);
+      const t = flowTotal(c);
+      body += payHTML(c, t, c.redir ? `Послуга переадресації` : `Накладений платіж за ${ps.length} пос.`);
+    } else if (FLOW.step === 'reprint'){
+      if (!FLOW.newTtn) FLOW.newTtn = ttn();
+      body += speaker(c, 'Дякую, що допомогли!');
+      body += `<div class="ttn" style="margin-bottom:10px"><div class="bar">▌▍▌▌▍▌▍▍▌▌▍▌▍▌▌▍▍▌</div>${FLOW.newTtn} · ${c.redir.type === 'back' ? '🔙 повернення → ' + c.redir.from : '↪ ' + c.redir.city + (c.redir.type === 'person' ? ' · ' + esc(c.redir.name) : '')}</div>
+        <button class="ok" style="width:100%;padding:14px" data-act="reprint">🖨️ Надрукувати нову ТТН і відправити</button>`;
     } else if (FLOW.step === 'give'){
       body += speaker(c, 'Дякую!');
       body += `<div class="pile" style="margin-bottom:10px">${ps.map(p => parcelHTML(p, '')).join('')}</div>
@@ -920,12 +1076,18 @@ function renderFlow(){
     }
   } else {
     const it = c.items[FLOW.i];
-    const steps = [];
-    c.items.forEach((_,i) => steps.push('Пакування','Зважування','Місто'));
-    steps.push('Оплата','ТТН');
-    const base = FLOW.i*3;
-    const si = {pack:base, weigh:base+1, city:base+2, pay:c.items.length*3, print:c.items.length*3+1}[FLOW.step];
-    body += stepsBar(steps, si);
+    const LBL = {pack:'Пакування', weigh:'Зважування', value:'Вартість', city:'Місто', pay:'Оплата', print:'ТТН'};
+    const keys = []; let si = 0;
+    c.items.forEach((x,i) => itemSteps(x).forEach(k => { if (i === FLOW.i && k === FLOW.step) si = keys.length; keys.push(k); }));
+    if (FLOW.step === 'pay') si = keys.length; if (FLOW.step === 'print') si = keys.length + 1;
+    keys.push('pay','print');
+    body += stepsBar(keys.map(k => LBL[k]), si);
+    if (FLOW.step === 'value'){
+      if (!FLOW.valOpts) FLOW.valOpts = shuffle([...new Set([it.val, it.val*10, Math.max(100, Math.round(it.val/10/100)*100), it.val + pick([1000,2000,500])])]);
+      body += speaker(c, `Там ${it.item.toLowerCase()}, оголосіть вартість <b>${fmt(it.val)} ₴</b>, щоб було застраховано.`);
+      body += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${it.item}</b><div class="mute">Цінне відправлення: потрібна оголошена вартість (страховка 0,5%)</div></div></div>
+        <div class="opts">${FLOW.valOpts.map(v => `<button data-act="valpick" data-v="${v}">${fmt(v)} ₴</button>`).join('')}</div>`;
+    }
     if (FLOW.step === 'pack' || FLOW.step === 'weigh' || FLOW.step === 'city'){
       const say = FLOW.step === 'city' ? `Відправляємо в <b>${it.city}</b>, на відділення.` :
         `${esc(FLOW.i ? 'І ще одну:' : c.hi)} <b>${it.item.toLowerCase()}</b>${it.f ? ' — обережно, там крихке!' : ''}${c.items.length>1?` (${FLOW.i+1}/${c.items.length})`:''}`;
@@ -954,11 +1116,47 @@ function renderFlow(){
   const pr = clamp(c.pat/c.max, 0, 1);
   showModal(`${c.av} ${esc(c.name)}${reg?' ⭐':''}`, `<div class="pat" style="margin:-4px 0 10px"><i data-pat="${c.id}" style="width:${pr*100}%"></i></div>${body}`, true);
 }
+function itemSteps(it){ return it.val ? ['pack','weigh','value','city'] : ['pack','weigh','city']; }
+function getSteps(c){
+  const ps = G.parcels.filter(p => c.pids.includes(p.id));
+  const cod = ps.reduce((a,p) => a + p.cod, 0);
+  const k = ['phone'];
+  if (c.proxy) k.push('proxy');
+  k.push('cells');
+  if (c.inspect) k.push('inspect');
+  if (c.redir){ k.push('redir'); if (c.redir.type !== 'back') k.push('pay'); k.push('reprint'); }
+  else { if (cod) k.push('pay'); k.push('give'); }
+  return k;
+}
+function nextGetStep(c, from){ const k = getSteps(c); return k[k.indexOf(from) + 1] || 'give'; }
+function flowTotal(c){
+  if (c.kind === 'send') return sendTotal(c).sum;
+  if (c.redir) return REDIR_FEE;
+  return G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0);
+}
+function manualMode(){ return !!(G.outage && G.outage.on && !G.up.gen); }
+function dayStr(off){ const d = new Date(Date.now() + off*864e5); return d.toLocaleDateString('uk-UA'); }
+function proxyHTML(c, p){
+  const x = c.proxy;
+  if (!x.date) x.date = x.kind === 'expired' ? dayStr(-ri(5,200)) : dayStr(ri(20,300));
+  const giver = x.kind === 'wrongName' ? x.other : p.name;
+  let h = `<div class="terminal">📟 Отримувач посилки: <b>${esc(p.name)}</b> · ${c.phone}<br>👥 Довірені особи в застосунку: ${x.kind === 'app' ? `<b>${esc(c.name)}</b>` : 'немає'}</div>`;
+  const say = {doc:`Ось довіреність, ${x.rel === 'мами' ? 'мама' : 'вона(він)'} сама(сам) прийти не може.`, app:'Мене додали в застосунку як довірену особу, ось паспорт.',
+    noDoc:'Довіреності нема, але мені дозволили, чесно-чесно! Віддайте, будь ласка 🙏', wrongName:'Ось довіреність, все оформлено.', expired:'Ось довіреність, все законно.'}[x.kind];
+  h += speaker(c, `${c.hi} ${say}`);
+  if (x.kind !== 'noDoc' && x.kind !== 'app')
+    h += `<div class="doc"><b>ДОВІРЕНІСТЬ</b><br>Я, <b>${esc(giver)}</b>, довіряю <b>${esc(c.name)}</b> отримувати мої поштові відправлення.<br>Дійсна до: <b>${x.date}</b><br>Підпис: ✍️ <span class="stamp">НОТАРІУС</span></div>`;
+  if (!x.pass) x.pass = `${'АВСЕКМН'[ri(0,6)]}${'АВСЕКМН'[ri(0,6)]} ${ri(100000,999999)}`;
+  h += `<div class="doc">🪪 <b>ПАСПОРТ</b> · ${esc(c.name)} · серія ${x.pass}</div>
+    <div class="mute" style="margin-bottom:6px">Сьогодні ${dayStr(0)}. Перевір, чи має людина право забрати посилку.</div>
+    <div class="opts"><button class="ok" data-act="proxyok">✅ Видати за довіреністю</button><button data-act="proxyno">⛔ Відмовити у видачі</button></div>`;
+  return h;
+}
 function sendTotal(c){
   let sum = 0; const parts = [];
   for (const it of c.items){
-    const pr = sendPrice(it.w, it.f); sum += pr + (it.packPrice||0);
-    parts.push(`${it.e} доставка ${pr} ₴${it.packPrice?` + пакування ${it.packPrice} ₴`:''}`);
+    const pr = sendPrice(it.w, it.f), vf = valFee(it.val); sum += pr + (it.packPrice||0) + vf;
+    parts.push(`${it.e} доставка ${pr} ₴${it.packPrice?` + пакування ${it.packPrice} ₴`:''}${vf?` + страховка ${vf} ₴`:''}`);
   }
   return {sum, label: parts.join('<br>')};
 }
@@ -967,18 +1165,75 @@ function flowAct(act, el){
   const v = el.dataset.v;
   if (act === 'nina'){ FLOW.ninaOk = true; c.pat -= 6; return renderFlow(); }
   if (act === 'findrow'){
-    if (v === c.phone){ sScan(); FLOW.step = 'cells'; } else mistake('Це не той номер телефону!');
+    if (v === c.phone){ sScan(); FLOW.step = nextGetStep(c, 'phone'); } else mistake('Це не той номер телефону!');
     return renderFlow();
   }
-  if (act === 'fetchcell'){
-    const ps = G.parcels.filter(p => c.pids.includes(p.id) && !FLOW.picked.includes(p.id) && p.cell === el.dataset.id);
-    if (ps.length){ sScan(); FLOW.picked.push(ps[0].id); }
-    else mistake('У цій комірці немає посилки клієнта');
-    if (c.pids.every(id => FLOW.picked.includes(id))){
-      const cod = G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0);
-      FLOW.step = cod ? 'pay' : 'give';
+  if (act === 'appscan'){ FLOW.step = nextGetStep(c, 'phone'); return renderFlow(); }
+  if (act === 'proxyok' || act === 'proxyno'){
+    const x = c.proxy;
+    if (act === 'proxyno'){
+      if (!x.ok){
+        FLOW = null; closeModal(); removeClient(c);
+        G.rating = clamp(G.rating + 0.03, 1, 5); addXp(15); countTask('fraud', 1); G.stats.fraud = (G.stats.fraud||0) + 1;
+        toast(`🚫 ${x.kind === 'noDoc' ? 'Без довіреності' : x.kind === 'expired' ? 'Довіреність прострочена' : 'Довіреність від іншої людини'} — шахрай пішов ні з чим. Молодець! +15 XP`, 'good');
+      } else {
+        FLOW = null; closeModal(); removeClient(c); rate(1, c); G.today.angry++; sErr();
+        toast(`😠 ${esc(c.name)}: «Все ж було оформлено правильно! Я буду скаржитись!»`, 'bad');
+      }
+      return;
     }
+    if (!x.ok){
+      FLOW.mist++; G.rating = clamp(G.rating - 0.2, 1, 5); G.money -= 200; sErr();
+      toast('😱 Це був шахрай! Справжній отримувач напише скаргу: штраф 200 ₴, рейтинг ↓', 'bad');
+    } else sScan();
+    FLOW.step = nextGetStep(c, 'proxy'); return renderFlow();
+  }
+  if (act === 'fetchcell'){ FLOW.openCell = el.dataset.id; beep(600, 0.04, 'triangle'); return renderFlow(); }
+  if (act === 'closecell'){ FLOW.openCell = null; return renderFlow(); }
+  if (act === 'pickscan'){
+    const pid = +el.dataset.id;
+    if (c.pids.includes(pid) && !FLOW.picked.includes(pid)) FLOW.picked.push(pid);
+    else { mistake('Не та посилка — звір номер ТТН!'); return renderFlow(); }
+    afterPick(c); return renderFlow();
+  }
+  if (act === 'lostsearch'){ FLOW.step = 'search'; FLOW.grid = null; return renderFlow(); }
+  if (act === 'lostpick'){
+    const g = FLOW.grid[+v]; if (!g) return;
+    if (g.ok){
+      const lp = G.parcels.find(p => c.pids.includes(p.id) && p.lost);
+      if (lp){ lp.lost = 0; FLOW.picked.push(lp.id); }
+      sScan(); toast('🎉 Знайшлась! Лежала не на своєму місці.', 'good'); addXp(8); countTask('lost', 1);
+      FLOW.step = 'cells'; FLOW.openCell = null; afterPick(c);
+    } else { g.no = 1; sErr(); c.pat -= 3; }
     return renderFlow();
+  }
+  if (act === 'open'){ FLOW.opened = true; beep(300, 0.15, 'sawtooth', 0.03); return renderFlow(); }
+  if (act === 'inspok'){
+    if (c.inspect.bad){ mistake('Клієнт відмовляється платити — оформи відмову!'); return renderFlow(); }
+    FLOW.step = nextGetStep(c, 'inspect'); return renderFlow();
+  }
+  if (act === 'inspno'){
+    if (!c.inspect.bad){ mistake('Все ціле, клієнт хоче забрати посилку!'); return renderFlow(); }
+    FLOW.step = 'refuse'; return renderFlow();
+  }
+  if (act === 'refuse'){
+    const ip = G.parcels.find(p => p.id === c.inspect.pid);
+    if (ip) returnParcel(ip);
+    c.pids = c.pids.filter(id => id !== c.inspect.pid); FLOW.picked = FLOW.picked.filter(id => id !== c.inspect.pid);
+    FLOW.refused = 1; sScan(); countTask('refuse', 1);
+    if (!c.pids.length) return finishRefuse(c);
+    c.inspect = null; FLOW.step = nextGetStep(c, 'cells'); return renderFlow();
+  }
+  if (act === 'redirpick'){
+    const rd = c.redir, right = rd.type === 'city' ? rd.city : rd.type === 'person' ? rd.name : 'back';
+    if (v !== right){ mistake(rd.type === 'back' ? 'Клієнт просив повернути відправнику!' : rd.type === 'city' ? `Клієнт казав «${rd.city}»!` : `Новий отримувач — ${rd.name}!`); return renderFlow(); }
+    sScan(); FLOW.step = nextGetStep(c, 'redir'); return renderFlow();
+  }
+  if (act === 'reprint') return finishRedir(c);
+  if (act === 'valpick'){
+    const it = c.items[FLOW.i];
+    if (+v !== it.val){ mistake(`Клієнт казав ${fmt(it.val)} ₴!`); return renderFlow(); }
+    sScan(); FLOW.step = 'city'; FLOW.cityOpts = null; return renderFlow();
   }
   if (act === 'pay'){
     if ((v === 'card') !== c.card){ mistake(c.card ? 'Клієнт хотів оплатити карткою' : 'Клієнт дає готівку!'); return renderFlow(); }
@@ -987,7 +1242,7 @@ function flowAct(act, el){
     return renderFlow();
   }
   if (act === 'change'){
-    const total = c.kind === 'get' ? G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0) : sendTotal(c).sum;
+    const total = flowTotal(c);
     if (+v === FLOW.pay.given - total){ sCash(); nextAfterPay(c); } else mistake('Неправильна решта!');
     return renderFlow();
   }
@@ -1008,7 +1263,7 @@ function flowAct(act, el){
     return renderFlow();
   }
   if (act === 'weigh'){ FLOW.weighed = true; beep(1200, 0.05); return renderFlow(); }
-  if (act === 'weighok'){ FLOW.step = 'city'; FLOW.cityOpts = null; return renderFlow(); }
+  if (act === 'weighok'){ FLOW.step = c.items[FLOW.i].val ? 'value' : 'city'; FLOW.valOpts = null; FLOW.cityOpts = null; return renderFlow(); }
   if (act === 'city'){
     const it = c.items[FLOW.i];
     if (v !== it.city){ mistake(`Клієнт казав «${it.city}»!`); return renderFlow(); }
@@ -1019,7 +1274,26 @@ function flowAct(act, el){
   }
   if (act === 'print') return finishSend(c);
 }
-function nextAfterPay(c){ FLOW.step = c.kind === 'get' ? 'give' : 'print'; FLOW.pay = {}; }
+function nextAfterPay(c){ FLOW.step = c.kind === 'get' ? (c.redir ? 'reprint' : 'give') : 'print'; FLOW.pay = {}; }
+function afterPick(c){
+  if (c.pids.every(id => FLOW.picked.includes(id))){ FLOW.openCell = null; FLOW.step = nextGetStep(c, 'cells'); }
+}
+function finishRefuse(c){
+  const sat = rate(flowSat(c) + 0.5, c);
+  FLOW = null; closeModal(); removeClient(c);
+  addMoney(15); addXp(12); sCash();
+  toast(`${'⭐'.repeat(Math.round(sat))} Відмову оформлено, посилка поїде назад відправнику`, 'good');
+}
+function finishRedir(c){
+  const ps = G.parcels.filter(p => c.pids.includes(p.id));
+  ps.forEach(p => redirectParcel(p, c.redir));
+  if (FLOW.newTtn && ps[0]) ps[0].ttn = FLOW.newTtn;
+  const fee = c.redir.type === 'back' ? 0 : REDIR_FEE;
+  const sat = rate(flowSat(c), c);
+  FLOW = null; closeModal(); removeClient(c);
+  addMoney(fee + 10); addXp(14); sCash(); countTask('redir', 1);
+  toast(`${'⭐'.repeat(Math.round(sat))} ${c.redir.type === 'back' ? '🔙 Повернення оформлено' : '↪ Переадресацію оформлено'} · +${fee + 10} ₴ · поїде вечірньою машиною`, 'good');
+}
 function flowSat(c){
   let sat = 5 - FLOW.mist + FLOW.extra;
   if (c.pat/c.max < 0.3) sat -= 1;
@@ -1113,8 +1387,9 @@ function showSettings(){
 /* ---------- дії ---------- */
 function act(a, el){
   const id = +el.dataset.id;
-  if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina'].includes(a)) return flowAct(a, el);
+  if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina','appscan','proxyok','proxyno','closecell','pickscan','lostsearch','lostpick','open','inspok','inspno','refuse','redirpick','reprint','valpick'].includes(a)) return flowAct(a, el);
   switch(a){
+    case 'scanhint': return toast('📟 Затисни штрихкод на посилці, щоб відсканувати');
     case 'serve': return openServe(id || (G.queue.find(c => !c.by)||{}).id);
     case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
     case 'mclose': if (modalIsFlow && FLOW){ FLOW.hidden = true; closeModal(); dirty = true; } else closeModal(); return;
@@ -1127,7 +1402,7 @@ function act(a, el){
     case 'take': {
       const p = G.parcels.find(p => p.id === id); if (!p) return;
       if (G.hand === id){ G.hand = null; dirty = true; return; }
-      G.hand = id; p.target = targetCell(p); sScan();
+      G.hand = id; p.target = targetCell(p);
       if (!p.target) toast('Немає вільних комірок такого розміру — купи стелажі або видавай посилки!', 'bad');
       dirty = true; return;
     }
@@ -1135,7 +1410,7 @@ function act(a, el){
       const cid = el.dataset.id;
       const hand = G.parcels.find(p => p.id === G.hand);
       if (!hand){
-        const ps = G.parcels.filter(p => p.state === 'cell' && p.cell === cid);
+        const ps = G.parcels.filter(p => p.state === 'cell' && p.cell === cid && !p.lost);
         toast(ps.length ? `${cid}: ` + ps.map(p => `${p.e} …${String(p.ttn).slice(-4)}`).join(' ') : `${cid}: порожньо`);
         return;
       }
@@ -1196,6 +1471,7 @@ function act(a, el){
   }
 }
 document.addEventListener('click', e => {
+  if (performance.now() - SCAN.last < 450) return; // клік після «піку» не рахуємо
   const t = e.target.closest('[data-tab]');
   if (t){ TAB = t.dataset.tab; if (TAB === 'online'){ NET.unread = 0; loadTop(); chatPoll(); } dirty = true; window.scrollTo(0,0); return; }
   const a = e.target.closest('[data-act]');
