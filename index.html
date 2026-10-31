@@ -165,6 +165,7 @@ main{padding:4px 10px}
 .hearts{color:var(--red);font-size:12px}
 .code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
 .guide li{margin-bottom:6px}
+.visit{margin-top:8px}.visit .vq{display:flex;gap:6px;font-size:28px;justify-content:center;min-height:36px}.visit .vw{display:flex;gap:10px;justify-content:center;font-size:24px;flex-wrap:wrap}
 .decor{display:flex;gap:6px;font-size:24px;justify-content:flex-end;margin:-4px 0 -6px;flex-wrap:wrap}
 .traits{display:flex;gap:4px;flex-wrap:wrap;margin:3px 0}.traits span{background:var(--blue2);color:var(--blue);border-radius:8px;padding:1px 6px;font-size:12px;font-weight:600}
 .mbars{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 6px;align-items:center;font-size:12px;color:var(--mute);max-width:420px}.mbars .lvl{margin:0}
@@ -209,7 +210,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610312002; // ставиться build.py
+const GAME_BUILD = 202610312008; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -588,6 +589,7 @@ function truckArrive(kind){
       const it = r.big ? pick(ITEMS.filter(i => i.s >= 3)) : pick(ITEMS.filter(i => i.s <= 2));
       ids.push(makeParcel({item:it, phone:ri_.phone, name:r.n, reg:r.id}).id);
     }
+    if (kind === 'm' || kind === 'd') giftParcels().forEach(id => ids.push(id));
     for (let i=0;i<n;i++){
       const p = makeParcel();
       ids.push(p.id);
@@ -626,11 +628,19 @@ function readyParcels(){
 function spawnClient(force){
   if (G.queue.length >= queueMax()) return;
   const avail = readyParcels();
+  const gp = avail.find(p => p.gift);
+  if (gp && !G.queue.some(c => c.gift) && Math.random() < 0.5){
+    const group = avail.filter(p => p.gift);
+    const c = {id:G.cid++, kind:'get', name:G.nick, av:'🙋', reg:null, by:null, pids:group.map(p => p.id), items:[], gift:true, card:true, phone:gp.phone, app:true,
+      hi:`Це ж я! 😄 Мені подарунок прийшов від <b>${esc(gp.gift.from)}</b>!`};
+    c.max = c.pat = 200; group.forEach(p => p.res = c.id);
+    G.queue.push(c); dirty = true; return;
+  }
   const unlocked = REGS.filter(r => G.level >= r.lvl && !G.queue.some(c => c.reg === r.id));
   let reg = null;
   const regPool = unlocked.filter(r => r.kind === 'send' || avail.some(p => p.reg === r.id));
   if (regPool.length && (Math.random() < 0.22 || regPool.some(r => r.kind==='get' && avail.some(p => p.reg===r.id) && Math.random() < 0.15))) reg = pick(regPool);
-  const plain = avail.filter(p => !p.reg);
+  const plain = avail.filter(p => !p.reg && !p.gift);
   const kind = reg ? reg.kind : (plain.length && Math.random() < 0.62 ? 'get' : 'send');
   const pp = reg ? {name:reg.n, av:reg.av} : person();
   const c = {id:G.cid++, kind, name:pp.name, av:pp.av, reg: reg ? reg.id : null, by:null, pids:[], items:[]};
@@ -785,7 +795,7 @@ function staffFinish(s){
   let money = 0, n = 0;
   if (c.kind === 'get'){
     let ps = G.parcels.filter(p => c.pids.includes(p.id));
-    ps.forEach(p => { p.lost = 0; });
+    ps.forEach(p => { p.lost = 0; }); giftResult(ps);
     if (c.redir){ ps.forEach(p => redirectParcel(p, c.redir)); money = c.redir.type === 'back' ? 10 : 55; n = ps.length; ps = []; }
     if (c.proxy && !c.proxy.ok){
       if (Math.random() < 0.45 + s.lvl*0.1){ removeClient(c); toast(`🚫 ${esc(s.name)} не віддав(ла) посилку шахраю`, 'good'); addXp(5); return; }
@@ -955,7 +965,7 @@ function cleanHall(){
 
 /* ---------- день ---------- */
 function startDay(){
-  G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null;
+  G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null; pullGifts();
   rollDay(); genTasks();
   G.staff.forEach(s => { s.bonusDay = 0; });
   if (G.candDay < G.day || !G.cand.length) refreshCand();
@@ -1643,6 +1653,7 @@ function flowSat(c){
 }
 function finishGet(c){
   const ps = G.parcels.filter(p => c.pids.includes(p.id));
+  giftResult(ps);
   const money = ps.reduce((a,p) => a + 15 + Math.round(p.cod*0.02), 0);
   G.parcels = G.parcels.filter(p => !c.pids.includes(p.id));
   G.stats.issued += ps.length; G.today.issued += ps.length;
@@ -1839,7 +1850,21 @@ function act(a, el){
     case 'copycode': { const t = $('.code').textContent; navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Скопійовано', 'good'), () => {}); return; }
     case 'restore': return restoreFromCode($('#rcode').value.trim());
     case 'register': return registerOnline();
-    case 'onltab': NET.sub = el.dataset.v; dirty = true; return;
+    case 'onltab': NET.sub = el.dataset.v; if (NET.sub === 'week') loadWeek(); if (NET.sub === 'rev') loadMyReviews(); if (NET.sub === 'dev') devRefresh(); dirty = true; return;
+    case 'revstar': NET.revStars = +el.dataset.v; if (NET.visit) NET.visit.draw(NET.visit.revs); return;
+    case 'revsend': return sendReview(el.dataset.id);
+    case 'giftmenu': NET.giftK = null; return showGiftMenu(el.dataset.id);
+    case 'giftsel': NET.giftK = el.dataset.k; return showGiftMenu(NET.giftTo);
+    case 'giftsend': return sendGift(el.dataset.id);
+    case 'devrefresh': return devRefresh();
+    case 'devann': { const t = ($('#devann').value || '').trim(); if (!t) return; devCall('np_admin_announce', {p_body:t}, '📢 Оголошення надіслано').then(devRefresh); return; }
+    case 'devannoff': devCall('np_admin_ann_off', {p_ann:+el.dataset.id}, 'Прибрано').then(devRefresh); return;
+    case 'devglobal': { const h = +$('#devh').value || 24, ev = $('#devev').value, w = $('#devw').value;
+      Promise.all([devCall('np_admin_global', {p_k:'event', p_v:ev, p_hours: ev ? h : 0}), devCall('np_admin_global', {p_k:'weather', p_v:w, p_hours: w ? h : 0})]).then(() => { toast('🎉 Глобальні події оновлено', 'good'); devRefresh(); }); return; }
+    case 'devflag': { const k = el.dataset.k; devCall('np_admin_global', {p_k:k, p_v:String(Date.now()), p_hours:24}, k === 'insp' ? '👔 Завтра у всіх буде перевірка' : '🔦 Завтра у всіх відключать світло'); return; }
+    case 'devgift': { const to = $('#devto').value || null, t = $('#devgt').value, n = Math.max(1, Math.min(999999, Math.round(+$('#devgn').value || 0)));
+      devCall('np_admin_gift', {p_to:to, p_item:`dev:${t}:${n}`, p_note:$('#devgnote').value || ''}).then(r => { if (r !== null) toast(`🎁 Надіслано ${r} гравц${r === 1 ? 'ю' : 'ям'}`, 'good'); }); return; }
+    case 'devchatdel': devCall('np_admin_chat_del', {p_msg:+el.dataset.id}, 'Видалено').then(() => { const m = NET.chat.find(x => x.id === +el.dataset.id); if (m) m.del = 1; drawChat(); }); return;
     case 'lbsort': NET.sort = el.dataset.v; NET.top = null; loadTop(); dirty = true; return;
     case 'chatsend': return chatSend();
     case 'player': return showPlayer(el.dataset.id);
@@ -1869,7 +1894,7 @@ function loadLocal(){
 }
 
 /* ---------- онлайн ---------- */
-const NET = {ok: !!(CFG.supabaseUrl && CFG.supabaseKey), unread:0, sub:'top', sort:'level', top:null, chat:[], lastId:0, lastCloud:0, ch:null, saving:false};
+const NET = {ok: !!(CFG.supabaseUrl && CFG.supabaseKey), unread:0, sub:'top', sort:'level', top:null, chat:[], lastId:0, lastCloud:0, ch:null, saving:false, admin:false, week:null, myRev:null, adm:null, gev:null, gweather:null};
 async function rpc(fn, args){
   if (!NET.ok) throw new Error('offline');
   const r = await fetch(`${CFG.supabaseUrl}/rest/v1/rpc/${fn}`, {method:'POST', headers:{'Content-Type':'application/json', apikey:CFG.supabaseKey}, body:JSON.stringify(args||{})});
@@ -1878,7 +1903,22 @@ async function rpc(fn, args){
   return j;
 }
 function randSecret(){ const a = new Uint8Array(24); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2,'0')).join(''); }
-function statsPayload(){ return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1}; }
+function isoWeek(){
+  const d = new Date(); const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear(), w = Math.ceil(((t - Date.UTC(y,0,1))/864e5 + 1)/7);
+  return `${y}-${pad(w)}`;
+}
+function weekParcels(){
+  const tot = G.stats.issued + G.stats.sent, k = isoWeek();
+  if (!G.week || G.week.k !== k) G.week = {k, base: tot};
+  return {k, n: Math.max(0, tot - G.week.base)};
+}
+function hallPayload(){
+  return {wall:G.decor.wall, items:Object.keys(G.decor.items||{}).slice(0,20), tier:G.up.tier, win:G.up.windows, staff:G.staff.slice(0,10).map(s => s.av),
+    badges:(G.badges||[]).slice(-8).map(b => b.e), branches:1 + G.others.length, regs:Object.values(G.regs).filter(r => r.met).length, coffee:G.up.coffee, locker:G.up.locker};
+}
+function statsPayload(){ const w = weekParcels(); return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1, rank:G.rank, hall:hallPayload(), wk:w.k, wk_parcels:w.n}; }
 async function cloudSave(force){
   if (!G || !G.pid || NET.saving) return false;
   if (!force && Date.now() - NET.lastCloud < 55000) return false;
@@ -1985,34 +2025,204 @@ async function chatSend(){
 }
 function drawChat(){
   const box = $('#chatbox'); if (!box) return;
-  box.innerHTML = NET.chat.map(m => `<div class="msg"><b data-nol10n>${esc(m.nick)}</b><span class="t">${new Date(m.at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'})}</span><br>${esc(m.body)}</div>`).join('') || '<div class="mute">Поки тихо. Привітайся першим! 👋</div>';
+  box.innerHTML = NET.chat.filter(m => !m.del).map(m => `<div class="msg"><b data-nol10n>${esc(m.nick)}</b><span class="t">${new Date(m.at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'})}</span>${NET.admin ? ` <button class="sm ghost" style="padding:0 6px" data-act="devchatdel" data-id="${m.id}">🗑</button>` : ''}<br>${esc(m.body)}</div>`).join('') || '<div class="mute">Поки тихо. Привітайся першим! 👋</div>';
   box.scrollTop = box.scrollHeight;
 }
 function viewOnline(){
-  const me = `<div class="card"><h3>👤 ${esc(G.nick)}</h3><div class="mute">${G.pid ? '<span class="dot on"></span>Ви онлайн · прогрес зберігається в хмару' : 'Відділення не підключене до онлайну'}</div>
+  const me = `<div class="card"><h3>👤 ${esc(G.nick)} <span class="mute">${RANKS[G.rank].e} ${RANKS[G.rank].n}</span></h3><div class="mute">${G.pid ? '<span class="dot on"></span>Ви онлайн · прогрес зберігається в хмару' : 'Відділення не підключене до онлайну'}</div>
     ${G.pid ? '' : '<button class="pri sm" style="margin-top:6px" data-act="register">🌐 Підключити онлайн</button>'}</div>`;
-  const sub = `<div class="subtabs"><button class="${NET.sub==='top'?'on':''}" data-act="onltab" data-v="top">🏆 Рейтинг відділень</button><button class="${NET.sub==='chat'?'on':''}" data-act="onltab" data-v="chat">💬 Чат</button></div>`;
+  const subs = [['top','🏆 Рейтинг'],['week','📅 Тиждень'],['chat','💬 Чат'],['rev','⭐ Відгуки'], ...(NET.admin ? [['dev','🛠 Розробник']] : [])];
+  const sub = `<div class="subtabs" style="flex-wrap:wrap">${subs.map(([k,n]) => `<button class="${NET.sub===k?'on':''}" data-act="onltab" data-v="${k}">${n}</button>`).join('')}</div>`;
   if (NET.sub === 'chat'){
     return me + sub + `<div class="card"><div class="chat" id="chatbox"></div><div class="row" style="flex-wrap:nowrap"><input id="chatin" maxlength="300" placeholder="Повідомлення…"><button class="pri" data-act="chatsend">➤</button></div></div>`;
   }
+  if (NET.sub === 'week'){
+    const w = NET.week, mine = weekParcels();
+    return me + sub + `<div class="card"><h3>📅 Тижневий конкурс відділень</h3><div class="mute">Хто видасть і прийме найбільше посилок за тиждень (пн–нд), отримує нагороду: 🥇 3 000 ₴, 🥈 2 000 ₴, 🥉 1 000 ₴, 4–10 місце 300 ₴ і значок. Нагорода приходить на початку наступного тижня. Ваші посилки цього тижня: <b>${fmt(mine.n)}</b></div>
+      ${!w ? '<div class="mute" style="margin-top:8px">Завантаження…</div>' : !w.length ? '<div class="mute" style="margin-top:8px">Цього тижня ще ніхто не працював. Будь першим!</div>' :
+      `<table class="lb" style="margin-top:8px"><tr><th>#</th><th>Відділення</th><th>📦 за тиждень</th></tr>${w.map((x,i) => `<tr class="${x.player_id===G.pid?'mine':''}" data-act="player" data-id="${x.player_id}" style="cursor:pointer"><td>${['🥇','🥈','🥉'][i] || i+1}</td><td><b data-nol10n>${esc(x.nickname)}</b><div class="mute" data-nol10n>${esc(x.branch)}</div></td><td>${fmt(x.parcels)}</td></tr>`).join('')}</table>`}</div>`;
+  }
+  if (NET.sub === 'rev'){
+    const r = NET.myRev;
+    const avg = r && r.length ? (r.reduce((a,x) => a + x.stars, 0)/r.length).toFixed(1) : null;
+    return me + sub + `<div class="card"><h3>⭐ Відгуки про ваше відділення ${avg ? `<span class="stars">${stars(Math.round(avg))}</span> ${avg}` : ''}</h3>
+      ${!G.pid ? '<div class="mute">Підключіть онлайн.</div>' : !r ? '<div class="mute">Завантаження…</div>' : !r.length ? '<div class="mute">Відгуків поки немає. Інші гравці можуть зайти у ваше відділення з рейтингу і залишити зірочки.</div>' :
+      r.map(x => `<div class="msg"><span class="stars">${stars(x.stars)}</span> <b data-nol10n>${esc(x.from_nick)}</b><span class="t">${new Date(x.at).toLocaleDateString('uk-UA')}</span>${x.body ? `<br>${esc(x.body)}` : ''}</div>`).join('')}</div>`;
+  }
+  if (NET.sub === 'dev' && NET.admin) return me + sub + viewDev();
   const sorts = [['level','Рівень'],['parcels','Посилки'],['rating','Рейтинг'],['money','Гроші']];
   const top = NET.top;
   const online = top ? top.filter(p => p.online).length : 0;
   return me + sub + `<div class="card"><div class="row" style="margin-bottom:8px">${sorts.map(([k,n]) => `<button class="sm ${NET.sort===k?'pri':''}" data-act="lbsort" data-v="${k}">${n}</button>`).join('')}<span class="sp"></span><span class="mute"><span class="dot on"></span>онлайн: ${online}</span></div>
+    <div class="mute" style="margin-bottom:6px">Натисни на відділення, щоб зайти в гості, залишити відгук або надіслати подарунок.</div>
     ${!top ? '<div class="mute">Завантаження…</div>' : !top.length ? '<div class="mute">Поки нікого. Будь першим!</div>' :
     `<table class="lb"><tr><th>#</th><th>Відділення</th><th>Рів.</th><th>⭐</th><th>📦</th></tr>${top.map((p,i) => `<tr class="${p.id===G.pid?'mine':''}" data-act="player" data-id="${p.id}" style="cursor:pointer">
-      <td>${i+1}</td><td><span class="dot ${p.online?'on':''}"></span><b data-nol10n>${esc(p.nickname)}</b><div class="mute" data-nol10n>${esc(p.branch)}</div></td><td>${p.level}</td><td>${(+p.rating).toFixed(2)}</td><td>${fmt(p.parcels)}</td></tr>`).join('')}</table>`}</div>`;
+      <td>${i+1}</td><td><span class="dot ${p.online?'on':''}"></span>${RANKS[p.rank||0].e} <b data-nol10n>${esc(p.nickname)}</b> ${((p.hall||{}).badges||[]).join('')}<div class="mute" data-nol10n>${esc(p.branch)}${p.rev_n ? ` · відгуки ${p.rev_avg}★ (${p.rev_n})` : ''}</div></td><td>${p.level}</td><td>${(+p.rating).toFixed(2)}</td><td>${fmt(p.parcels)}</td></tr>`).join('')}</table>`}</div>`;
 }
 function afterOnline(){ if (NET.sub === 'chat') drawChat(); }
-function showPlayer(id){
-  const p = (NET.top||[]).find(x => x.id === id); if (!p) return;
+async function showPlayer(id){
+  let p = (NET.top||[]).find(x => x.id === id);
+  if (!p){ await loadTop(); p = (NET.top||[]).find(x => x.id === id); }
+  if (!p) return;
+  const h = p.hall || {};
   const seen = p.online ? '<span class="dot on"></span>зараз онлайн' : `був(ла) ${new Date(p.last_seen).toLocaleString('uk-UA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`;
-  showModal(`🏤 ${esc(p.nickname)}`, `<div class="card"><h3 data-nol10n>${esc(p.branch)}</h3><div class="mute">${seen}</div></div>
-    <div class="card kv"><span>Рівень</span><b>${p.level}</b><span>⭐ Рейтинг</span><b>${(+p.rating).toFixed(2)}</b>
-    <span>📦 Посилок оброблено</span><b>${fmt(p.parcels)}</b><span>💰 Каса</span><b>${fmt(p.money)} ₴</b>
-    <span>👥 Персонал</span><b>${p.staff}</b><span>📅 Відпрацьовано днів</span><b>${p.days}</b></div>
-    <button class="pri" style="width:100%" data-act="mclose">Закрити</button>`);
+  const mine = id === G.pid;
+  const draw = (revs) => {
+    const my = revs && revs.find(r => r.from_id === G.pid);
+    const st = NET.revStars || (my ? my.stars : 5);
+    showModal(`🏤 У гостях: ${esc(p.nickname)}`, `<div class="card hallcard" style="background:${(WALLS[h.wall]||WALLS.cream)[1]}">${decorStrip({items:Object.fromEntries((h.items||[]).map(k => [k,1]))})}
+        <h3 data-nol10n>${esc(p.branch)}</h3><div class="mute">${RANKS[p.rank||0].e} ${RANKS[p.rank||0].n} · ${TIERS[h.tier||0]} · ${seen}</div>
+        <div class="visit"><div class="vq">${Array.from({length:Math.min(6, 2 + (h.regs||0))}, () => pick([...AV_M, ...AV_F])).map(a => `<span>${a}</span>`).join('')}</div>
+        <div class="counter"></div><div class="vw">${Array.from({length:h.win||1}, (_,i) => `<span title="Віконце ${i+1}">🪟${i === 0 ? '🧑‍💼' : (h.staff||[])[i-1] || ''}</span>`).join('')}${h.coffee ? '<span>☕</span>' : ''}${h.locker ? '<span>🟥</span>' : ''}</div></div>
+        ${(h.badges||[]).length ? `<div>🏅 ${h.badges.join(' ')}</div>` : ''}</div>
+      <div class="card kv"><span>Рівень</span><b>${p.level}</b><span>⭐ Рейтинг</span><b>${(+p.rating).toFixed(2)}</b>
+      <span>📦 Посилок оброблено</span><b>${fmt(p.parcels)}</b><span>👥 Персонал</span><b>${p.staff}</b><span>🏤 Відділень</span><b>${h.branches||1}</b><span>📅 Днів</span><b>${p.days}</b></div>
+      <div class="card"><h3>⭐ Відгуки ${p.rev_n ? `<span class="mute">${p.rev_avg}★ · ${p.rev_n}</span>` : ''}</h3>
+        ${!revs ? '<div class="mute">Завантаження…</div>' : revs.length ? revs.slice(0, 10).map(x => `<div class="msg"><span class="stars">${stars(x.stars)}</span> <b data-nol10n>${esc(x.from_nick)}</b>${x.body ? `<br>${esc(x.body)}` : ''}</div>`).join('') : '<div class="mute">Ще немає відгуків.</div>'}
+        ${!mine && G.pid ? `<div style="margin-top:8px"><div class="row" style="gap:2px">${[1,2,3,4,5].map(n => `<button class="sm ${n<=st?'pri':''}" data-act="revstar" data-v="${n}" data-id="${id}">★</button>`).join('')}</div>
+          <div class="row" style="flex-wrap:nowrap;margin-top:6px"><input id="revbody" maxlength="200" placeholder="Короткий відгук (необов’язково)" value="${esc(my ? my.body : '')}"><button class="pri" data-act="revsend" data-id="${id}">${my ? 'Оновити' : 'Залишити'}</button></div></div>` : ''}</div>
+      ${!mine && G.pid ? `<button class="ok" style="width:100%;margin-bottom:8px" data-act="giftmenu" data-id="${id}">🎁 Надіслати подарунок</button>` : ''}
+      <button class="ghost" style="width:100%" data-act="mclose">Вийти з гостей</button>`);
+  };
+  NET.visit = {id, draw}; NET.revStars = 0;
+  draw(null);
+  try { const r = await rpc('np_reviews_for', {p_to:id}); if (NET.visit && NET.visit.id === id) { NET.visit.revs = r || []; draw(NET.visit.revs); } } catch(e){ draw([]); }
 }
+function showGiftMenu(id){
+  const p = (NET.top||[]).find(x => x.id === id) || (NET.week||[]).find(x => x.player_id === id) || {nickname:''};
+  showModal(`🎁 Подарунок для ${esc(p.nickname)}`, `<p class="mute">Подарунок приїде у відділення друга справжньою посилкою — йому треба буде видати її самому собі 😄</p>
+    <div class="opts">${Object.entries(GIFTS).map(([k,g]) => `<button data-act="giftsel" data-k="${k}" class="${NET.giftK===k?'on':''}" ${G.money < g.c ? 'disabled' : ''}><span style="font-size:26px">${g.e}</span><br>${g.n}<br><small>${fmt(g.c)} ₴ · ${g.d}</small></button>`).join('')}</div>
+    <input id="giftnote" maxlength="120" placeholder="Записка (необов’язково)" style="margin-top:8px">
+    <button class="pri" style="width:100%;margin-top:8px" data-act="giftsend" data-id="${id}" ${NET.giftK ? '' : 'disabled'}>Надіслати${NET.giftK ? ' · ' + fmt(GIFTS[NET.giftK].c) + ' ₴' : ''}</button>`);
+  NET.giftTo = id;
+}
+async function sendGift(id){
+  const k = NET.giftK, g = GIFTS[k]; if (!g) return;
+  if (G.money < g.c) return toast('Не вистачає грошей', 'bad');
+  const note = ($('#giftnote') || {}).value || '';
+  try {
+    await rpc('np_gift_send', {p_id:G.pid, p_secret:G.secret, p_to:id, p_item:k, p_note:note});
+    G.money -= g.c; G.stats.giftsSent = (G.stats.giftsSent||0) + 1; NET.giftK = null; save(); checkAch();
+    closeModal(); toast(`🎁 ${g.e} ${g.n} відправлено!`, 'good'); dirty = true;
+  } catch(e){ toast(/gift limit/.test(e.message) ? 'Ліміт: 10 подарунків на добу' : 'Не вдалося відправити', 'bad'); }
+}
+async function sendReview(id){
+  const stars_ = NET.revStars || ((NET.visit && NET.visit.revs || []).find(r => r.from_id === G.pid) || {}).stars || 5;
+  try {
+    await rpc('np_review', {p_id:G.pid, p_secret:G.secret, p_to:id, p_stars:stars_, p_body:($('#revbody')||{}).value || ''});
+    toast('⭐ Відгук залишено!', 'good'); loadTop(); showPlayer(id);
+  } catch(e){ toast('Не вдалося залишити відгук', 'bad'); }
+}
+/* ---------- панель розробника ---------- */
+function viewDev(){
+  const a = NET.adm;
+  const pl = (NET.top||[]);
+  return `<div class="card"><h3>🛠 Панель розробника</h3><div class="mute">Бачите тільки ви. Дії стосуються всіх гравців «Нашої Пошти».</div>
+    ${a ? `<div class="kv" style="margin-top:8px"><span>👥 Гравців</span><b>${a.players}</b><span>🟢 Онлайн зараз</span><b>${a.online}</b><span>📅 Заходили за добу</span><b>${a.today}</b><span>🆕 Нових за тиждень</span><b>${a.new_week}</b><span>💬 Повідомлень у чаті</span><b>${a.chat}</b><span>🎁 Подарунків</span><b>${a.gifts}</b><span>⭐ Відгуків</span><b>${a.reviews}</b></div>` : '<div class="mute">Завантаження…</div>'}
+    <button class="sm" style="margin-top:6px" data-act="devrefresh">🔄 Оновити</button></div>
+  <div class="card"><h3>📢 Оголошення всім</h3><textarea id="devann" maxlength="600" rows="3" style="width:100%;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line)" placeholder="Текст оголошення…"></textarea>
+    <button class="pri sm" data-act="devann">Надіслати оголошення</button>
+    ${a && a.announces.length ? `<div style="margin-top:8px">${a.announces.map(x => `<div class="task"><div style="flex:1;white-space:pre-wrap">${esc(x.body)}</div><button class="sm ghost" data-act="devannoff" data-id="${x.id}">Прибрати</button></div>`).join('')}</div>` : ''}</div>
+  <div class="card"><h3>🎉 Глобальні події</h3><div class="mute">Подія діє для всіх на наступних змінах, поки не мине час.</div>
+    <div class="row" style="margin-top:6px"><select id="devev" style="width:auto"><option value="">— без свята —</option>${Object.entries(EVENTS).map(([k,e]) => `<option value="${k}" ${NET.gev===k?'selected':''}>${e.e} ${e.n}</option>`).join('')}</select>
+      <select id="devw" style="width:auto"><option value="">— погода звичайна —</option>${Object.entries(WEATHER).map(([k,w]) => `<option value="${k}" ${NET.gweather===k?'selected':''}>${w.e} ${w.n}</option>`).join('')}</select>
+      <input id="devh" type="number" value="24" min="1" max="336" style="width:90px"> год <button class="sm pri" data-act="devglobal">Застосувати</button></div>
+    <div class="row" style="margin-top:8px"><button class="sm" data-act="devflag" data-k="insp">👔 Перевірка всім завтра</button><button class="sm" data-act="devflag" data-k="outage">🔦 Відключення світла всім завтра</button></div></div>
+  <div class="card"><h3>🎁 Подарунки від розробника</h3>
+    <div class="row"><select id="devto" style="width:auto"><option value="">👥 Усім гравцям</option>${pl.map(x => `<option value="${x.id}">${esc(x.nickname)}</option>`).join('')}</select>
+      <select id="devgt" style="width:auto"><option value="money">💰 Гроші</option><option value="xp">⭐ Досвід</option></select>
+      <input id="devgn" type="number" value="1000" min="1" max="999999" style="width:110px"></div>
+    <input id="devgnote" maxlength="120" placeholder="Записка" style="margin-top:6px"><button class="pri sm" style="margin-top:6px" data-act="devgift">Надіслати</button>
+    <div class="mute" style="margin-top:4px">Подарунок приїде гравцю посилкою з найближчою машиною.</div></div>
+  <div class="card"><h3>👥 Гравці</h3><table class="lb"><tr><th>Нік</th><th>Рів.</th><th>Був</th></tr>${pl.map(x => `<tr data-act="player" data-id="${x.id}" style="cursor:pointer"><td><span class="dot ${x.online?'on':''}"></span>${esc(x.nickname)}</td><td>${x.level}</td><td>${new Date(x.last_seen).toLocaleString('uk-UA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')}</table>
+    <div class="mute" style="margin-top:6px">Щоб видалити повідомлення в чаті — натисни 🗑 біля нього.</div></div>`;
+}
+async function devCall(fn, args, okMsg){
+  try { const r = await rpc(fn, {p_id:G.pid, p_secret:G.secret, ...args}); if (okMsg) toast(okMsg, 'good'); return r ?? true; } catch(e){ toast('Помилка: ' + e.message, 'bad'); return null; }
+}
+async function devRefresh(){ NET.adm = await devCall('np_admin_stats', {}); loadTop(); pollGlobal(); dirty = true; }
+/* ---------- онлайн: оголошення, глобальні події, подарунки, тиждень ---------- */
+const GIFTS = {
+  coffee:{n:'Пакунок кави', e:'☕', c:300, d:'увесь персонал друга: настрій +20'},
+  flowers:{n:'Букет квітів', e:'💐', c:350, d:'рейтинг відділення друга +0,05'},
+  cake:{n:'Торт', e:'🍰', c:400, d:'постійні клієнти друга: +1 ❤'},
+  plant:{n:'Вазон для залу', e:'🪴', c:500, d:'вазон у зал друга (або 400 ₴, якщо вже є)'},
+  toy:{n:'Іграшка-талісман', e:'🧸', c:600, d:'другові +150 XP'},
+  money:{n:'Конверт з грошима', e:'✉️', c:1000, d:'другові 800 ₴'},
+};
+async function pollGlobal(){
+  try {
+    const r = await rpc('np_global_get', {});
+    const m = {}; (r||[]).forEach(x => m[x.k] = x.v);
+    NET.gev = m.event || null; NET.gweather = m.weather || null;
+    if (m.insp && G && G.ginsp !== m.insp){ G.ginsp = m.insp; NET.forceInsp = true; }
+    if (m.outage && G && G.gout !== m.outage){ G.gout = m.outage; NET.forceOutage = true; }
+  } catch(e){}
+}
+async function pollAnnounce(){
+  if (!G) return;
+  try {
+    const r = await rpc('np_announce_recent', {p_after: G.seenAnn || 0});
+    const list = (r||[]).filter(a => a.id > (G.seenAnn||0));
+    if (!list.length) return;
+    G.seenAnn = Math.max(...list.map(a => a.id)); save();
+    const html = list.map(a => `<div class="card"><div class="mute">${new Date(a.at).toLocaleString('uk-UA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div><div style="white-space:pre-wrap">${esc(a.body)}</div></div>`).join('');
+    const show = () => showModal('📢 Оголошення від розробника', html + '<button class="pri" style="width:100%" data-act="mclose">Зрозуміло</button>');
+    if (modalIsFlow || !$('#modal').classList.contains('hidden')) setTimeout(show, 4000); else show();
+  } catch(e){}
+}
+async function pullGifts(){
+  if (!G || !G.pid) return;
+  try {
+    const r = await rpc('np_gifts_pull', {p_id:G.pid, p_secret:G.secret});
+    if (r && r.length){
+      G.gifts = (G.gifts||[]).concat(r.map(g => ({id:g.id, from:g.from_nick, item:g.item, note:g.note})));
+      save(); toast(`🎁 Вам ${r.length > 1 ? r.length + ' подарунки їдуть' : 'подарунок їде'}! Приїде з найближчою машиною.`, 'gold');
+    }
+  } catch(e){}
+}
+function giftLabel(item){
+  if (item.startsWith('dev:')){ const [, t, n] = item.split(':'); return t === 'money' ? `💰 ${fmt(+n)} ₴` : `⭐ ${fmt(+n)} XP`; }
+  const g = GIFTS[item]; return g ? `${g.e} ${g.n}` : '🎁';
+}
+function applyGift(g){
+  const it = g.item;
+  if (it.startsWith('dev:')){ const [, t, n] = it.split(':'); if (t === 'money') addMoney(+n); else addXp(+n); }
+  else if (it === 'coffee') G.staff.forEach(s => s.mood = Math.min(100, (s.mood ?? 80) + 20));
+  else if (it === 'flowers') G.rating = clamp(G.rating + 0.05, 1, 5);
+  else if (it === 'cake') Object.values(G.regs).forEach(r => { if (r.met) r.hearts = Math.min(5, r.hearts + 1); });
+  else if (it === 'plant'){ if (G.decor.items.plant) addMoney(400); else G.decor.items.plant = 1; }
+  else if (it === 'toy') addXp(150);
+  else if (it === 'money') addMoney(800);
+}
+function giftParcels(){
+  // подарунки приїжджають машиною як справжні посилки на ваше ім'я
+  const ids = [];
+  for (const g of (G.gifts||[]).splice(0)){
+    const p = makeParcel({item: g.item.startsWith('dev:') ? ITEM('Подарунок') : ITEM('Подарунок'), name:G.nick, phone: G.myPhone || (G.myPhone = phone())});
+    p.gift = g; p.e = g.item.startsWith('dev:') ? '🛠️' : (GIFTS[g.item] || {}).e || '🎁'; p.cod = 0; ids.push(p.id);
+  }
+  return ids;
+}
+function giftResult(ps){
+  const gs = ps.filter(p => p.gift).map(p => p.gift); if (!gs.length) return;
+  gs.forEach(applyGift);
+  setTimeout(() => showModal('🎁 Подарунок!', gs.map(g => `<div class="card"><b>${giftLabel(g.item)}</b> від <b data-nol10n>${esc(g.from)}</b>${g.note ? `<div class="bubble" style="margin:6px 0 0">${esc(g.note)}</div>` : ''}<div class="mute">${g.item.startsWith('dev:') ? '' : GIFTS[g.item] ? GIFTS[g.item].d.replace('друга', 'вашого відділення').replace('другові', 'вам') : ''}</div></div>`).join('') + '<button class="pri" style="width:100%" data-act="mclose">Дякую! 💝</button>'), 300);
+}
+async function weekClaim(){
+  if (!G || !G.pid) return;
+  try {
+    const r = await rpc('np_week_claim', {p_id:G.pid, p_secret:G.secret});
+    if (!r || !r.place) return;
+    const pl = r.place, rew = pl === 1 ? 3000 : pl === 2 ? 2000 : pl === 3 ? 1000 : pl <= 10 ? 300 : 100;
+    const b = pl === 1 ? '🥇' : pl === 2 ? '🥈' : pl === 3 ? '🥉' : '🎖️';
+    if (pl <= 10){ G.badges = G.badges || []; G.badges.push({e:b, t:`${pl} місце тижня ${r.wk}`}); }
+    addMoney(rew); save(); cloudSave(true);
+    showModal('🏆 Підсумки тижневого конкурсу', `<div class="bigstart"><div class="e">${b}</div><h2>${pl} місце з ${r.total}</h2><p>Тиждень ${r.wk}. Нагорода: <b>${fmt(rew)} ₴</b>${pl <= 10 ? ' і значок у профілі' : ''}.</p></div><button class="pri" style="width:100%" data-act="mclose">Ура!</button>`);
+  } catch(e){}
+}
+async function loadWeek(){ try { NET.week = await rpc('np_week_top', {}); if (TAB === 'online') dirty = true; } catch(e){ NET.week = NET.week || []; } }
+async function loadMyReviews(){ if (!G.pid) return; try { NET.myRev = await rpc('np_reviews_for', {p_to:G.pid}); if (TAB === 'online') dirty = true; } catch(e){} }
 
 /* ---------- оновлення гри ---------- */
 async function checkVersion(){
@@ -2058,6 +2268,9 @@ function boot(){
   setInterval(checkVersion, 300000); checkVersion();
   setInterval(() => { if (G && !G.pid && !NET.regTried){ NET.regTried = true; registerOnline(); } }, 120000);
   setTimeout(chatPoll, 1500);
+  setTimeout(() => { pollGlobal(); pollAnnounce(); pullGifts(); weekClaim(); }, 2500);
+  setInterval(() => { if (G){ pollGlobal(); pollAnnounce(); } }, 180000);
+  setInterval(() => { if (G && G.pid){ pullGifts(); } }, 300000);
   window.addEventListener('beforeunload', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden && G){ save(); cloudSave(true); } });
 }
