@@ -165,6 +165,9 @@ main{padding:4px 10px}
 .hearts{color:var(--red);font-size:12px}
 .code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
 .guide li{margin-bottom:6px}
+.banner{background:#fff;border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:14px}
+.banner.ev{border-left-color:var(--amber);background:var(--amber2)}.banner.insp{border-left-color:var(--red);background:var(--red3)}.banner.dark{border-left-color:#000;background:#2b2b2b;color:#eee}
+#dark{position:fixed;inset:0;pointer-events:none;z-index:55;background:radial-gradient(circle 190px at var(--fx,50%) var(--fy,45%),transparent 0,transparent 55%,rgba(5,5,15,.8) 100%)}
 
 /* сканер штрихкодів */
 .bc{position:relative;display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #bbb;border-radius:6px;padding:4px 6px 2px;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none;overflow:hidden}
@@ -197,9 +200,10 @@ main{padding:4px 10px}
 <div id="modal" class="hidden"></div>
 <div id="toasts"></div>
 <div id="updbar" class="hidden"></div>
+<div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610311956; // ставиться build.py
+const GAME_BUILD = 202610311959; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -243,7 +247,31 @@ const ITEMS = [
   {n:'Картина', e:'🖼️', s:3, w:[2,5], f:1, v:[1000,10000]},
   {n:'Чохол для телефону', e:'📲', s:0, w:[0.05,0.2]},
   {n:'Кава в зернах', e:'☕', s:1, w:[0.5,1.5]},
+  {n:'Квіти', e:'💐', s:2, w:[0.5,2], f:1, ev:1},
+  {n:'Ялинкові іграшки', e:'🎄', s:1, w:[0.3,1.5], f:1, ev:1},
+  {n:'Шоколад', e:'🍫', s:0, w:[0.1,0.5], ev:1},
 ];
+const BASE_ITEMS = ITEMS.filter(i => !i.ev);
+/* ---------- події дня ---------- */
+const EVENTS = {
+  sale:{n:'Розпродаж на маркетплейсі', e:'🏷️', flow:1.3, truck:1.35, extra:1, items:['Одяг','Кросівки','Косметика','Чохол для телефону'], d:'Інтернет-магазини влаштували знижки — посилок більше, приїде додаткова машина.'},
+  val:{n:'День святого Валентина', e:'💝', flow:1.35, truck:1.3, extra:0, items:['Квіти','Шоколад','Подарунок','Косметика'], d:'Квіти, шоколад і подарунки коханим.'},
+  bf:{n:'Чорна п’ятниця', e:'🖤', flow:1.7, truck:1.6, extra:1, items:['Кросівки','Телефон','Ноутбук','Одяг','Косметика'], d:'Найбільші знижки року! Подвійні машини і натовп клієнтів.'},
+  ny:{n:'Новий рік', e:'🎄', flow:1.5, truck:1.45, extra:1, items:['Ялинкові іграшки','Подарунок','Шоколад','Іграшки'], d:'Всі шлють подарунки під ялинку!'},
+};
+const EV_CYCLE = {7:'sale', 14:'val', 21:'bf', 0:'ny'}; // кожні 7 днів гри — свято
+function eventFor(day){ return day >= 5 ? (EV_CYCLE[day % 28] || null) : null; }
+const WEATHER = {
+  sun:{n:'Сонячно', e:'☀️', mul:1}, cloud:{n:'Хмарно', e:'⛅', mul:1}, rain:{n:'Дощ', e:'🌧️', mul:0.7, wet:1},
+  storm:{n:'Злива', e:'⛈️', mul:0.55, wet:1}, snow:{n:'Сніг', e:'❄️', mul:0.8, wet:1}, fog:{n:'Туман', e:'🌫️', mul:0.9},
+};
+function rollWeather(){
+  const winter = [10,11,0,1,2].includes(new Date().getMonth());
+  const r = Math.random();
+  return r < 0.35 ? 'sun' : r < 0.65 ? 'cloud' : r < 0.85 ? 'rain' : r < 0.92 ? 'storm' : winter ? 'snow' : 'fog';
+}
+function curEvent(){ return G && G.ev ? EVENTS[G.ev] : null; }
+function pickItem(){ const ev = curEvent(); return ev && Math.random() < 0.45 ? ITEM(pick(ev.items)) : pick(BASE_ITEMS); }
 const ITEM = n => ITEMS.find(i => i.n === n) || ITEMS[0];
 const CITIES = ['Київ','Львів','Одеса','Харків','Дніпро','Вінниця','Полтава','Чернігів','Ужгород','Івано-Франківськ','Тернопіль','Луцьк','Рівне','Житомир','Суми','Черкаси','Запоріжжя','Миколаїв','Кропивницький','Хмельницький','Чернівці','Херсон'];
 const OPS = ['050','063','066','067','068','073','093','095','096','097','098','099'];
@@ -278,6 +306,7 @@ const UPS = {
   ac:{n:'Кондиціонер', e:'❄️', start:0, costs:[3000], need:[5], d:l=>l?'Клієнти ставлять оцінку на 0,3 вищу.':'Прохолода у залі покращує оцінки.'},
   ads:{n:'Вивіска і реклама', e:'📣', start:0, costs:[1000,3000,7000], need:[2,5,9], d:l=>`Клієнтів більше на ${l*15}%.`},
   locker:{n:'Поштомат', e:'🟥', start:0, costs:[5000,9000,15000], need:[6,8,10], d:l=>l?`≈${l*12}% посилок забирають з поштомату (+12 ₴ за кожну, без черги).`:'Частину посилок клієнти заберуть самі.'},
+  gen:{n:'Генератор', e:'🔌', start:0, costs:[3500], need:[3], d:l=>l?'Під час відключень світла все працює (пальне 100 ₴ за відключення).':'Без нього при відключенні світла — ручний режим з ліхтариком.'},
   tier:{n:'Розширення відділення', e:'🏢', start:0, costs:[6000,15000,35000], need:[5,10,15], d:l=>`${TIERS[l]}: клієнтів +${l*35}%, більші машини, до ${staffMax(l)} працівників.`},
 };
 const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', rest:'😴 Вихідний'};
@@ -305,7 +334,8 @@ function newGame(nick, branch){
   return {v:1, nick, branch, pid:null, secret:null, day:1, time:480, phase:'night', money:1000, xp:0, level:1, rating:3.5,
     stats:{issued:0, sent:0, unloaded:0, placed:0, earned:0, clients:0},
     parcels:[], nid:1, queue:[], cid:1, truck:null, trucksDone:{}, hand:null,
-    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, tier:0},
+    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0},
+    ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
 }
 function migrate(g){
@@ -324,7 +354,7 @@ function migrate(g){
 /* ---------- формули ---------- */
 const smallCount = (l=G.up.shelves) => 8 + l*8;
 const bigCount = (l=G.up.shelves) => 2 + l*2;
-const queueMax = (l=G.up.chairs) => 6 + l*2;
+const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0);
 const staffMax = (l=G.up.tier) => 2 + l*2;
 const needXp = l => Math.round(120*Math.pow(l,1.5));
 const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1);
@@ -432,7 +462,7 @@ function regInfo(id){
   return G.regs[id];
 }
 function makeParcel(opts={}){
-  const it = opts.item || pick(ITEMS);
+  const it = opts.item || pickItem();
   const p = {id:G.nid++, ttn:ttn(), item:it.n, e:it.e, s:it.s, w:+rnd(it.w[0], it.w[1]).toFixed(1), f:it.f?1:0,
     cod: Math.random() < 0.4 ? ri(2,40)*25 : 0, phone: opts.phone || phone(), name: opts.name || person().name,
     city: pick(CITIES), from: pick(CITIES), state: opts.state || 'truck', cell:null, reg: opts.reg || null, unl:0, inDay:0, inT:0};
@@ -440,13 +470,15 @@ function makeParcel(opts={}){
   return p;
 }
 function truckArrive(kind){
-  const leave = {m:600, d:870, e:1185}[kind];
+  const leave = {m:600, x:720, d:870, e:1185}[kind];
   if (kind === 'e'){
     G.truck = {kind:'out', leaveAt:leave, key:kind};
     sBell(); toast('🚚 Приїхала вечірня машина — завантаж відправлення!', 'gold');
   } else {
     let n = ri(6,9) + G.level + G.up.tier*4;
     if (kind === 'd') n = Math.max(3, Math.round(n*0.6));
+    if (kind === 'x') n = Math.max(4, Math.round(n*0.7));
+    const ev = curEvent(); if (ev) n = Math.round(n*ev.truck);
     const ids = [];
     // посилки постійним клієнтам
     for (const r of REGS) if (r.kind === 'get' && G.level >= r.lvl && Math.random() < 0.4){
@@ -460,7 +492,7 @@ function truckArrive(kind){
       if (Math.random() < 0.15 && i < n-1){ ids.push(makeParcel({phone:p.phone, name:p.name}).id); i++; }
     }
     G.truck = {kind:'in', leaveAt:leave, key:kind};
-    sBell(); toast(`🚚 Приїхала машина: ${ids.length} посилок на розвантаження!`, 'gold');
+    sBell(); toast(`🚚 Приїхала ${kind === 'x' ? 'додаткова ' : ''}машина: ${ids.length} посилок на розвантаження!`, 'gold');
   }
   G.trucksDone[kind] = 1;
   dirty = true;
@@ -523,7 +555,7 @@ function spawnClient(force){
   } else {
     const n = reg && reg.multi ? reg.multi : (Math.random() < 0.12 ? 2 : 1);
     for (let i=0;i<n;i++){
-      const it = reg ? ITEM(pick(reg.items)) : pick(ITEMS);
+      const it = reg ? ITEM(pick(reg.items)) : pickItem();
       c.items.push({item:it.n, e:it.e, s:it.s, f:it.f?1:0, packed:it.packed?1:0, w:+rnd(it.w[0], it.w[1]).toFixed(1), city:pick(CITIES), val: it.v ? Math.round(rnd(it.v[0], it.v[1])/100)*100 : 0});
     }
     c.hi = reg ? reg.hi : pick(SEND_HI);
@@ -568,7 +600,9 @@ function removeClient(c){
   dirty = true;
 }
 function rate(sat, c){
-  sat = clamp(sat + satBonus(), 1, 5);
+  sat = clamp(sat + satBonus() - (G.dirt > 60 ? 0.3 : 0), 1, 5);
+  G.dirt = clamp(G.dirt + ((WEATHER[G.weather]||{}).wet ? 2.2 : 1.2), 0, 100);
+  if (G.insp && G.insp.state === 'on') G.insp.served++;
   G.rating = clamp(G.rating + (sat - G.rating)*0.06, 1, 5);
   G.today.served++; G.today.satSum += sat;
   if (c && c.reg){
@@ -588,6 +622,7 @@ function clientLeftAngry(c){
   removeClient(c);
   rate(1, c);
   G.today.angry++;
+  if (G.insp && G.insp.state === 'on') G.insp.angry++;
   sErr();
   toast(`😠 ${esc(c.name)}: «${pick(LEAVE_ANGRY)}»`, 'bad');
 }
@@ -680,8 +715,9 @@ function storeAction(s){
   }
   if (G.truck && G.truck.kind === 'out'){
     const o = G.parcels.find(p => p.state === 'outgoing');
-    if (o){ o.state = 'loaded'; dirty = true; }
+    if (o){ o.state = 'loaded'; dirty = true; return; }
   }
+  if (G.dirt > 0) G.dirt = Math.max(0, G.dirt - 4); // вільна хвилинка — прибирає зал
 }
 function returnParcel(p){ p.state = 'outgoing'; p.city = p.from || pick(CITIES); p.ret = 1; p.cell = null; p.res = null; p.lost = 0; dirty = true; }
 function redirectParcel(p, rd){
@@ -698,9 +734,72 @@ function placeParcel(p, cell, byStaff){
   dirty = true;
 }
 
+/* ---------- день: свята, погода, перевірка, світло ---------- */
+function rollDay(){
+  G.ev = (NET.gev && EVENTS[NET.gev]) ? NET.gev : eventFor(G.day) || (G.day >= 3 && Math.random() < 0.06 ? 'sale' : null);
+  G.eve = !G.ev && !!eventFor(G.day + 1);
+  G.weather = NET.gweather && WEATHER[NET.gweather] ? NET.gweather : rollWeather();
+  G.insp = null; G.outage = null;
+  if ((G.level >= 3 && G.day - (G.lastInsp||0) >= 3 && Math.random() < 0.16) || NET.forceInsp){ G.insp = {at: ri(600, 1020), state:'wait'}; NET.forceInsp = false; }
+  if ((G.day >= 3 && Math.random() < 0.09) || NET.forceOutage){ const f = ri(600, 1020); G.outage = {from:f, to:f + ri(60,150), on:false, done:false}; NET.forceOutage = false; }
+  const ev = curEvent(), w = WEATHER[G.weather];
+  setTimeout(() => {
+    if (ev) toast(`${ev.e} Сьогодні ${ev.n}! ${ev.d}`, 'gold');
+    else if (G.eve) toast('🎉 Завтра свято — сьогодні ажіотаж, черга аж до дверей!', 'gold');
+    toast(`${w.e} Погода: ${w.n}${w.mul < 1 ? ' — клієнтів буде менше' : ''}`);
+  }, 600);
+}
+function dayFlowMul(){
+  const ev = curEvent(), w = WEATHER[G.weather] || WEATHER.sun;
+  return (ev ? ev.flow : 1) * (G.eve ? 1.25 : 1) * w.mul;
+}
+function inspTick(){
+  const I = G.insp; if (!I) return;
+  if (I.state === 'wait' && G.time >= I.at){
+    I.state = 'on'; I.until = G.time + 90; I.mist = 0; I.angry = 0; I.served = 0; I.qSum = 0; I.qN = 0; I.dirtSum = 0;
+    sBell(); toast('👔 Раптова перевірка! Регіональний менеджер оцінює чистоту, швидкість і помилки.', 'gold');
+    dirty = true;
+  }
+  if (I.state === 'on'){
+    I.qSum += G.queue.length; I.qN++; I.dirtSum += G.dirt;
+    if (G.time >= I.until) inspFinish();
+  }
+}
+function inspFinish(quiet){
+  const I = G.insp; I.state = 'done'; G.lastInsp = G.day;
+  const clean = clamp(5 - (I.dirtSum/Math.max(1,I.qN))/22, 1, 5);
+  const speed = clamp(5 - I.angry*1.2 - Math.max(0, I.qSum/Math.max(1,I.qN) - 3)*0.4, 1, 5);
+  const errs = clamp(5 - I.mist*0.8, 1, 5);
+  const avg = (clean + speed + errs)/3;
+  const bonus = avg >= 3.5 ? Math.round((avg - 2.5)*500/50)*50 : 0;
+  I.res = {clean:+clean.toFixed(1), speed:+speed.toFixed(1), errs:+errs.toFixed(1), avg:+avg.toFixed(1), bonus};
+  if (bonus){ addMoney(bonus); G.stats.inspGood = (G.stats.inspGood||0) + 1; countTask('insp', 1); }
+  if (avg < 2.5) G.rating = clamp(G.rating - 0.1, 1, 5);
+  if (quiet) return;
+  showModal('👔 Результати перевірки', `<div class="kv"><span>🧹 Чистота</span><b>${stars(Math.round(clean))}</b><span>⚡ Швидкість</span><b>${stars(Math.round(speed))}</b>
+    <span>✅ Без помилок</span><b>${stars(Math.round(errs))}</b><span>Загальна оцінка</span><b>${I.res.avg} / 5</b></div>
+    <p>${bonus ? `🎉 Менеджер задоволений! Премія відділенню: <b>${fmt(bonus)} ₴</b>` : avg < 2.5 ? '😬 Менеджер незадоволений, рейтинг відділення знижено.' : '🙂 Непогано, але без премії. Наступного разу вийде!'}</p>
+    <button class="pri" style="width:100%" data-act="mclose">Добре</button>`);
+}
+function outageTick(){
+  const O = G.outage; if (!O || O.done) return;
+  if (!O.on && G.time >= O.from){
+    O.on = true; FLOW && (FLOW.rows = terminalRows(flowClient() || {phone:''}));
+    if (G.up.gen){ G.money -= 100; toast('🔌 Відключення світла! Генератор запрацював (пальне −100 ₴)', 'gold'); }
+    else { sErr(); toast('🔦 Відключення світла! Термінал не працює — все вручну, з ліхтариком. Картки не приймаються.', 'bad'); }
+    dirty = true;
+  }
+  if (O.on && G.time >= O.to){ O.on = false; O.done = true; toast('💡 Світло дали!', 'good'); dirty = true; }
+}
+function cleanHall(){
+  if (G.phase !== 'day' || G.dirt < 5) return;
+  G.time += 10; G.dirt = 0; beep(300, 0.2, 'triangle', 0.04); toast('🧹 Зал прибрано (−10 хв)', 'good'); dirty = true;
+}
+
 /* ---------- день ---------- */
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null;
+  rollDay();
   if (G.candDay < G.day || !G.cand.length) refreshCand();
   truckArrive('m');
   TAB = 'ramp';
@@ -710,6 +809,7 @@ function startDay(){
 function endDay(){
   if (FLOW) closeModal();
   if (G.truck) truckLeave();
+  if (G.insp && G.insp.state === 'on') inspFinish(true);
   for (const c of [...G.queue]) removeClient(c);
   G.queue = [];
   // зарплати
@@ -722,7 +822,8 @@ function endDay(){
   // термін зберігання 5 днів
   const old = G.parcels.filter(p => p.state === 'cell' && G.day - p.inDay >= 5);
   if (old.length){ G.parcels = G.parcels.filter(p => !old.includes(p)); G.rating = clamp(G.rating - 0.02*old.length, 1, 5); }
-  const sum = {...G.today, day:G.day, expired:old.length, trained};
+  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res};
+  G.ev = null; G.eve = false; G.outage = null; G.insp = null;
   G.day++; G.phase = 'night'; G.time = 480;
   refreshCand();
   save(); cloudSave(true);
@@ -741,6 +842,8 @@ function tick(){
     const prev = G.time;
     G.time += dt*MIN_PER_SEC;
     const dMin = G.time - prev;
+    const ev = curEvent();
+    if (ev && ev.extra && prev < 630 && G.time >= 630 && !G.trucksDone.x){ if (G.truck) truckLeave(); truckArrive('x'); }
     if (prev < 780 && G.time >= 780 && !G.trucksDone.d){ if (G.truck) truckLeave(); truckArrive('d'); }
     if (prev < 1080 && G.time >= 1080 && !G.trucksDone.e){ if (G.truck) truckLeave(); truckArrive('e'); }
     if (G.truck && G.time >= G.truck.leaveAt) truckLeave();
@@ -748,7 +851,7 @@ function tick(){
     if (G.time < 1170){
       const h = G.time/60;
       const tf = h < 10 ? 0.7 : h < 12 ? 1 : h < 14 ? 1.4 : h < 17 ? 1 : h < 19 ? 1.5 : 0.6;
-      const lam = (0.03 + G.level*0.004) * (1 + G.up.ads*0.15) * (1 + G.up.tier*0.35) * tf * (0.5 + G.rating/7);
+      const lam = (0.03 + G.level*0.004) * (1 + G.up.ads*0.15) * (1 + G.up.tier*0.35) * tf * (0.5 + G.rating/7) * dayFlowMul();
       if (Math.random() < lam*dMin) spawnClient();
     }
     // терпіння
@@ -757,7 +860,8 @@ function tick(){
       c.pat -= dt * (c.by === 'me' ? 0.3 : 1);
       if (c.pat <= 0) clientLeftAngry(c);
     }
-    staffTick(dt);
+    staffTick(dt * (manualMode() ? 0.6 : 1));
+    inspTick(); outageTick();
     if (G.time >= 1200) endDay();
   }
   if (dirty && (!ptrDown || now - ptrDown > 1200)){ dirty = false; render(); } else liveUpdate();
@@ -774,6 +878,7 @@ function renderTop(){
     <div class="sp"></div>
     <span class="pill">День ${G.day}</span>
     <span class="pill">${tod}</span>
+    ${G.phase==='day' ? `<span class="pill" title="${(WEATHER[G.weather]||WEATHER.sun).n}">${(WEATHER[G.weather]||WEATHER.sun).e}${curEvent() ? ' ' + curEvent().e : ''}${manualMode() ? ' 🔦' : ''}</span>` : ''}
     <span class="pill" id="money">💰 ${fmt(G.money)} ₴</span>
     <span class="pill" title="Рейтинг відділення">⭐ <span id="rat">${G.rating.toFixed(2)}</span></span>
     <span class="pill">Рів. ${G.level}</span>
@@ -815,6 +920,7 @@ function liveUpdate(){
     el.style.width = s.cl ? clamp(s.t/serveT(s)*100, 0, 100).toFixed(0) + '%' : '0%';
   });
   const tl = $('#truckleft'); if (tl && G.truck) tl.textContent = hhmm(G.truck.leaveAt);
+  $('#dark').classList.toggle('hidden', !(G.phase === 'day' && manualMode()));
 }
 function clientHTML(c){
   const r = clamp(c.pat/c.max, 0, 1);
@@ -828,6 +934,7 @@ function viewHall(){
   if (G.phase === 'night'){
     return `<div class="card bigstart"><div class="e">🏤</div><h2>Відділення зачинене</h2>
       <p class="mute">Вночі можна найняти персонал, відправити когось на навчання і купити покращення.</p>
+      ${nightForecast()}
       <button class="pri" data-act="startday" style="font-size:18px;padding:14px 28px">🔑 Відкрити відділення · День ${G.day}</button></div>
       ${regsCard()}`;
   }
@@ -842,15 +949,26 @@ function viewHall(){
       `<div class="mute">${front.length ? 'вільне' : 'немає працівника видачі/прийому'}</div>`}</div>`;
   }
   const t = G.today;
-  return `<div class="card"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
+  const ev = curEvent(), I = G.insp, O = G.outage;
+  const banners = (ev ? `<div class="banner ev">${ev.e} <b>${ev.n}</b> — ${ev.d}</div>` : G.eve ? '<div class="banner ev">🎉 Завтра свято — сьогодні черга аж до дверей!</div>' : '')
+    + (I && I.state === 'on' ? `<div class="banner insp">👔 <b>Перевірка регіонального менеджера</b> до ${hhmm(I.until)} — тримай зал чистим, обслуговуй швидко і без помилок!</div>` : '')
+    + (O && O.on ? (G.up.gen ? '<div class="banner">🔌 Відключення світла — працює генератор.</div>' : `<div class="banner dark">🔦 <b>Світла немає</b> до ≈${hhmm(O.to)}: термінал і сканер не працюють, тільки готівка, персонал повільніший. Купи 🔌 генератор у покращеннях.</div>`) : '');
+  const dirtLbl = G.dirt < 25 ? 'чисто ✨' : G.dirt < 60 ? 'трохи брудно' : 'брудно! клієнти незадоволені';
+  return `${banners}<div class="card"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
     <div class="queue">${G.queue.length ? G.queue.map(clientHTML).join('') : '<div class="mute" style="padding:30px 6px">Поки нікого… Розклади посилки по комірках, щоб клієнти могли їх забрати.</div>'}</div>
     <div class="counter"></div>
     <div class="windows">${wins}</div></div>
+    <div class="card"><div class="row"><b>🧹 Чистота залу:</b><div class="lvl" style="flex:1;max-width:220px"><i class="on" style="flex:none;width:${100-G.dirt}%;background:${G.dirt<25?'var(--green)':G.dirt<60?'var(--amber)':'var(--red)'}"></i></div><span class="mute">${dirtLbl}</span><span class="sp"></span><button class="sm" data-act="clean" ${G.dirt<5?'disabled':''}>🧹 Прибрати (10 хв)</button></div></div>
     <div class="card"><h3>📊 Сьогодні</h3><div class="row mute">
       <span>📥 видано: <b>${t.issued}</b></span><span>📤 прийнято: <b>${t.sent}</b></span><span>🚚 розвантажено: <b>${t.unloaded}</b></span>
       <span>💰 зароблено: <b>${fmt(t.earned)} ₴</b></span><span>😠 пішли: <b>${t.angry}</b></span></div>
       <div class="mute" style="margin-top:6px">🚚 Машини: 08:00 і 13:00 привозять посилки · 18:00 забирає відправлення · 20:00 кінець зміни</div></div>
     ${regsCard()}`;
+}
+function nightForecast(){
+  const t = eventFor(G.day), n1 = eventFor(G.day + 1);
+  let nx = null; for (let d = G.day; d < G.day + 28; d++){ if (eventFor(d)){ nx = [d, EVENTS[eventFor(d)]]; break; } }
+  return `<p>${t ? `📅 Сьогодні: <b>${EVENTS[t].e} ${EVENTS[t].n}</b> — ${EVENTS[t].d}` : n1 ? `📅 Завтра свято ${EVENTS[n1].e} ${EVENTS[n1].n} — сьогодні буде ажіотаж!` : nx ? `📅 Наступне свято: ${nx[1].e} ${nx[1].n} — день ${nx[0]}` : ''}</p>`;
 }
 function regsCard(){
   const met = REGS.filter(r => G.regs[r.id] && G.regs[r.id].met);
@@ -865,7 +983,7 @@ function rackHTML(mode, needCells=[], pickedCells=[]){
   const load = cellLoad();
   const hand = G.parcels.find(p => p.id === G.hand);
   const glowSet = new Set();
-  if (G.up.scanner >= 1){
+  if (G.up.scanner >= 1 && !manualMode()){
     if (mode === 'place' && hand && hand.target) glowSet.add(hand.target);
     if (mode === 'fetch') needCells.forEach(c => { if (!pickedCells.includes(c)) glowSet.add(c); });
   }
@@ -967,9 +1085,9 @@ function openServe(id){
 function flowClient(){ return FLOW && G.queue.find(c => c.id === FLOW.cid); }
 function terminalRows(c){
   const phones = [...new Set(G.parcels.filter(p => p.state === 'cell').map(p => p.phone))].filter(p => p !== c.phone);
-  return shuffle([c.phone, ...shuffle(phones).slice(0, 5)]);
+  return shuffle([c.phone, ...shuffle(phones).slice(0, manualMode() ? 10 : 5)]);
 }
-function mistake(msg){ FLOW.mist++; sErr(); toast('❌ ' + msg, 'bad'); const c = flowClient(); if (c) c.pat -= 4; }
+function mistake(msg){ FLOW.mist++; if (G.insp && G.insp.state === 'on') G.insp.mist++; G.today.mist = (G.today.mist||0) + 1; sErr(); toast('❌ ' + msg, 'bad'); const c = flowClient(); if (c) c.pat -= 4; }
 function stepsBar(names, cur){ return `<div class="steps">${names.map((n,i) => `<i class="${i<=cur?'on':''}" title="${n}"></i>`).join('')}</div>`; }
 function speaker(c, text){ return `<div class="speaker"><span class="av">${c.av}</span><div class="bubble" style="flex:1">${text}</div></div>`; }
 function payHTML(c, total, label){
@@ -983,9 +1101,10 @@ function payHTML(c, total, label){
     return `${speaker(c, `Ось, тримайте <b>${FLOW.pay.given} ₴</b>.`)}<div class="terminal">💵 До сплати <b>${total} ₴</b> · отримано <b>${FLOW.pay.given} ₴</b><br>Скільки решти?</div>
       <div class="opts">${FLOW.pay.opts.map(v => `<button data-act="change" data-v="${v}">${v} ₴</button>`).join('')}</div>`;
   }
-  return `${speaker(c, c.card ? 'Можна карткою оплатити?' : 'Я готівкою, добре?')}
-    <div class="terminal">${label}<br>До сплати: <b style="font-size:20px">${total} ₴</b></div>
-    <div class="opts"><button data-act="pay" data-v="card">💳 Термінал</button><button data-act="pay" data-v="cash">💵 Готівка</button></div>`;
+  const man = manualMode();
+  return `${speaker(c, man && c.card ? 'Світла нема? Ну добре, тоді готівкою…' : c.card ? 'Можна карткою оплатити?' : 'Я готівкою, добре?')}
+    <div class="terminal">${label}<br>До сплати: <b style="font-size:20px">${total} ₴</b>${man ? '<br>🔦 Термінал без світла не працює' : ''}</div>
+    <div class="opts"><button data-act="pay" data-v="card" ${man?'disabled':''}>💳 Термінал</button><button data-act="pay" data-v="cash">💵 Готівка</button></div>`;
 }
 function renderFlow(){
   const c = flowClient();
@@ -1236,7 +1355,7 @@ function flowAct(act, el){
     sScan(); FLOW.step = 'city'; FLOW.cityOpts = null; return renderFlow();
   }
   if (act === 'pay'){
-    if ((v === 'card') !== c.card){ mistake(c.card ? 'Клієнт хотів оплатити карткою' : 'Клієнт дає готівку!'); return renderFlow(); }
+    if ((v === 'card') !== (c.card && !manualMode())){ mistake(c.card ? 'Клієнт хотів оплатити карткою' : 'Клієнт дає готівку!'); return renderFlow(); }
     sScan();
     if (v === 'card') nextAfterPay(c); else { FLOW.pay.stage = 'change'; }
     return renderFlow();
@@ -1344,6 +1463,7 @@ function showDaySummary(s){
     <span>💰 Зароблено</span><b>${fmt(s.earned)} ₴</b><span>👥 Зарплати</span><b>−${fmt(s.salaries)} ₴</b>
     ${s.expired?`<span>⌛ Повернуто (термін зберігання)</span><b>${s.expired}</b>`:''}
     ${s.returned?`<span>🔙 Не розвантажено з машин</span><b>${s.returned}</b>`:''}
+    ${s.insp ? `<span>👔 Перевірка менеджера</span><b>${s.insp.avg}/5${s.insp.bonus ? ' · +' + fmt(s.insp.bonus) + ' ₴' : ''}</b>` : ''}
     <span>⭐ Рейтинг відділення</span><b>${G.rating.toFixed(2)}</b></div>
     ${s.trained.length ? `<p>📚 Навчання завершили: ${s.trained.map(x => esc(x.name) + ' → ' + stars(x.lvl)).join(', ')}</p>` : ''}
     ${G.money < 0 ? '<p class="fr"><b>⚠ Гроші в мінусі! Заробіть більше або зменшіть персонал.</b></p>' : ''}
@@ -1394,6 +1514,7 @@ function act(a, el){
     case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
     case 'mclose': if (modalIsFlow && FLOW){ FLOW.hidden = true; closeModal(); dirty = true; } else closeModal(); return;
     case 'startday': return startDay();
+    case 'clean': return cleanHall();
     case 'pause': paused = !paused; dirty = true; return;
     case 'speed': G.settings.speed = G.settings.speed === 1 ? 2 : G.settings.speed === 2 ? 3 : 1; dirty = true; return;
     case 'savenow': save(); cloudSave(true).then(ok => toast(ok ? '💾 Збережено (і в хмару)' : '💾 Збережено на пристрої', 'good')); return;
@@ -1477,6 +1598,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]');
   if (a && a.dataset.act) act(a.dataset.act, a);
 });
+document.addEventListener('pointermove', e => { const d = $('#dark'); if (d && !d.classList.contains('hidden')){ d.style.setProperty('--fx', e.clientX + 'px'); d.style.setProperty('--fy', e.clientY + 'px'); } }, {passive:true});
 document.addEventListener('change', e => { const a = e.target.closest('[data-act="wrap"]'); if (a) flowAct('wrap', a); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'chatin') chatSend(); });
 
