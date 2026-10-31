@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Наша Пошта — симулятор відділення</title>
+<meta name="theme-color" content="#d62828">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --red:#d62828;--red2:#a4161a;--red3:#fde8e8;--bg:#f1eee9;--card:#fff;--ink:#222;--mute:#777;--line:#e4ddd3;
+  --green:#2a9d55;--green2:#e3f5ea;--amber:#e89a00;--amber2:#fff3d6;--blue:#2c6fbb;--blue2:#e6f0fb;--shelf:#c99a63;--shelf2:#8a6239;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:9px 14px;background:#ece7df;color:var(--ink);transition:transform .08s,filter .15s}
+button:active{transform:scale(.96)}
+button:disabled{opacity:.45;cursor:default;transform:none}
+button.pri{background:var(--red);color:#fff;font-weight:600}
+button.ok{background:var(--green);color:#fff;font-weight:600}
+button.ghost{background:transparent;border:1px solid var(--line)}
+button.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+input,select{font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%}
+.hidden{display:none!important}
+#app{max-width:1100px;margin:0 auto;padding-bottom:70px}
+/* header */
+#top{background:linear-gradient(180deg,var(--red),var(--red2));color:#fff;padding:8px 12px 10px;position:sticky;top:0;z-index:20;box-shadow:0 2px 8px #0003}
+.toprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:18px;letter-spacing:.3px;display:flex;align-items:center;gap:6px}
+.logo .lbox{background:#fff;color:var(--red);border-radius:7px;padding:1px 6px;font-size:14px}
+.branch{opacity:.9;font-size:13px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp{flex:1}
+.pill{background:#ffffff22;border-radius:20px;padding:3px 10px;font-weight:600;font-size:14px;white-space:nowrap}
+.topbtn{background:#ffffff22;color:#fff;padding:5px 9px;border-radius:9px;font-size:15px}
+.xpbar{height:5px;background:#ffffff33;border-radius:4px;margin-top:6px;overflow:hidden}
+.xpbar i{display:block;height:100%;background:#ffd166;width:0;transition:width .3s}
+.clock{font-variant-numeric:tabular-nums}
+/* tabs */
+#tabs{display:flex;gap:4px;padding:8px 10px;overflow-x:auto;position:sticky;top:0;z-index:15;background:var(--bg)}
+#tabs button{white-space:nowrap;background:#fff;border:1px solid var(--line);font-weight:600;position:relative}
+#tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.badge{position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;border-radius:10px;font-size:11px;padding:1px 6px;font-weight:700}
+@media(max-width:700px){#toasts{top:auto;bottom:78px}#updbar{bottom:130px}
+  #top{padding:6px 8px 7px}.toprow{gap:5px}.pill{font-size:12px;padding:2px 7px}.topbtn{padding:3px 6px;font-size:13px}.branch{display:none}.logo{font-size:15px}
+  #tabs{position:fixed;bottom:0;top:auto;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:6px;justify-content:space-between;gap:2px}
+  #tabs button{flex:1;padding:6px 2px;font-size:11px;border:0;display:flex;flex-direction:column;align-items:center;background:transparent}
+  #tabs button .ti{font-size:20px}#tabs button.on{background:var(--red3);color:var(--red2)}}
+@media(min-width:701px){#tabs button .ti{margin-right:4px}}
+main{padding:4px 10px}
+.card{background:var(--card);border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px #0000000d;border:1px solid var(--line)}
+.card h3{margin:0 0 8px;font-size:16px;display:flex;align-items:center;gap:6px}
+.mute{color:var(--mute);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+/* queue */
+.queue{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;min-height:120px;align-items:flex-end}
+.client{min-width:96px;max-width:96px;background:#faf8f5;border:1px solid var(--line);border-radius:12px;padding:6px;text-align:center;position:relative;animation:walkin .5s ease-out}
+.client.reg{border-color:var(--amber);background:var(--amber2)}
+.client.me{outline:2px solid var(--red)}
+.client .av{font-size:34px;line-height:1.1}
+.client .nm{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.client .kd{font-size:11px;color:var(--mute)}
+.client .who{font-size:10px;color:var(--blue);font-weight:600}
+.pat{height:5px;background:#e9e4dc;border-radius:3px;margin-top:4px;overflow:hidden}
+.pat i{display:block;height:100%;background:var(--green);transition:width .25s linear}
+@keyframes walkin{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.windows{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.win{border:2px dashed var(--line);border-radius:12px;padding:10px;text-align:center;background:#fff}
+.win.act{border-style:solid;border-color:var(--red)}
+.win .wt{font-weight:700;font-size:13px;margin-bottom:6px}
+.counter{background:linear-gradient(180deg,#e8e2d8,#d9d0c3);height:14px;border-radius:0 0 8px 8px;margin:-2px 0 10px}
+.bigstart{text-align:center;padding:26px 12px}
+.bigstart .e{font-size:60px}
+/* shelves */
+.racks{display:flex;flex-wrap:wrap;gap:10px}
+.rack{background:var(--shelf2);padding:5px;border-radius:8px}
+.rack .rt{color:#fff;font-size:11px;font-weight:700;text-align:center;margin-bottom:3px}
+.rack .cells{display:grid;grid-template-columns:repeat(4,46px);gap:4px}
+.rack.big .cells{grid-template-columns:repeat(2,70px)}
+.cell{background:var(--shelf);border-radius:5px;height:46px;padding:2px;font-size:10px;font-weight:700;color:#3d2a15;display:flex;flex-direction:column;justify-content:space-between;align-items:center;border:2px solid transparent}
+.rack.big .cell{height:58px}
+.cell .dots{font-size:13px;line-height:1;letter-spacing:-2px}
+.cell.glow{border-color:#ffd60a;box-shadow:0 0 10px #ffd60a;animation:pulse 1s infinite}
+.cell.full{filter:saturate(.4) brightness(.9)}
+.cell.picked{background:#9bd3a8}
+@keyframes pulse{50%{box-shadow:0 0 2px #ffd60a}}
+.pile{display:flex;flex-wrap:wrap;gap:6px}
+.parcel{background:#d8b384;border:1px solid #b08a5c;color:#3d2a15;border-radius:8px;padding:5px 7px;font-size:12px;min-width:70px;text-align:center;position:relative}
+.parcel .pe{font-size:20px}
+.parcel.sel{outline:3px solid var(--red);transform:translateY(-3px)}
+.parcel.s3,.parcel.s4{background:#c69c6d}
+.parcel .tag{font-size:9px;font-weight:700}
+.fr{color:var(--red2)}
+.terminal{background:#1d2b24;color:#7dffb0;font-family:ui-monospace,Consolas,monospace;border-radius:10px;padding:10px;font-size:13px;margin-bottom:8px;min-height:44px}
+.terminal b{color:#fff}
+/* truck */
+.truck{background:#fff;border-radius:14px;border:1px solid var(--line);padding:10px;position:relative;overflow:hidden}
+.truckbody{background:linear-gradient(180deg,#f8f8f8,#e8e8e8);border:3px solid #bbb;border-radius:10px;padding:8px;min-height:130px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;position:relative}
+.truckbody::before{content:"НАША ПОШТА";position:absolute;right:10px;bottom:6px;color:var(--red);font-weight:900;opacity:.18;font-size:26px;pointer-events:none}
+.truckcab{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.truckcab .te{font-size:40px;animation:drive .6s ease-out}
+@keyframes drive{from{transform:translateX(-80px)}to{transform:none}}
+.box{background:#d8b384;border:1px solid #9c7646;border-radius:6px;width:58px;height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3d2a15;position:relative}
+.box.s3{width:74px;height:60px}.box.s4{width:90px;height:68px;background:#c49562}
+.box .pr{position:absolute;bottom:2px;left:4px;right:4px;height:4px;background:#0002;border-radius:2px;overflow:hidden}
+.box .pr i{display:block;height:100%;background:var(--green)}
+.timer{font-weight:700;color:var(--red2)}
+/* staff & upgrades */
+.staff{display:flex;gap:10px;align-items:flex-start}
+.staff .av{font-size:38px}
+.stars{color:var(--amber);letter-spacing:-1px}
+.roles{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.roles button{padding:4px 8px;font-size:12px}
+.roles button.on{background:var(--ink);color:#fff}
+.ups{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.up .ue{font-size:30px}
+.lvl{display:flex;gap:3px;margin:6px 0}
+.lvl i{flex:1;height:6px;border-radius:3px;background:#e9e4dc}
+.lvl i.on{background:var(--green)}
+/* modal */
+#modal{position:fixed;inset:0;background:#0007;z-index:50;display:flex;align-items:center;justify-content:center;padding:10px}
+.mbox{background:var(--bg);border-radius:16px;max-width:640px;width:100%;max-height:94vh;overflow:auto;box-shadow:0 10px 40px #0005}
+.mhead{background:var(--red);color:#fff;padding:10px 14px;border-radius:16px 16px 0 0;display:flex;align-items:center;gap:8px;font-weight:700;position:sticky;top:0;z-index:2}
+.mhead .x{margin-left:auto;background:#ffffff33;color:#fff;padding:4px 10px}
+.mbody{padding:12px}
+.bubble{background:#fff;border-radius:14px;padding:10px 12px;border:1px solid var(--line);position:relative;margin:4px 0 10px 54px}
+.bubble::before{content:"";position:absolute;left:-8px;top:14px;border:8px solid transparent;border-right-color:#fff;border-left:0}
+.speaker{display:flex;align-items:flex-start;gap:0;position:relative}
+.speaker .av{font-size:40px;position:absolute;left:0;top:0}
+.steps{display:flex;gap:4px;margin-bottom:10px}
+.steps i{flex:1;height:5px;border-radius:3px;background:#ddd5ca}
+.steps i.on{background:var(--red)}
+.trow{display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid #2f4a3c;margin-bottom:5px}
+.trow:hover{background:#2a3d33}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.opts button{padding:12px 6px}
+.opts button.on{background:var(--ink);color:#fff}
+.itemcard{display:flex;gap:12px;align-items:center;background:#fff;border-radius:12px;padding:10px;border:1px solid var(--line);margin-bottom:10px}
+.itemcard .ie{font-size:48px}
+.scale{text-align:center;padding:14px}
+.scale .disp{display:inline-block;background:#1d2b24;color:#7dffb0;font-family:ui-monospace,monospace;font-size:30px;padding:6px 18px;border-radius:8px;min-width:150px}
+.ttn{background:#fff;border:2px dashed #999;border-radius:8px;padding:10px;font-family:ui-monospace,monospace;text-align:center}
+.ttn .bar{font-size:26px;letter-spacing:-1px;line-height:1}
+/* toasts */
+#toasts{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:94%;max-width:420px}
+.toast{background:#222d;color:#fff;padding:8px 14px;border-radius:12px;font-size:14px;animation:tin .25s ease-out;text-align:center;backdrop-filter:blur(4px)}
+.toast.good{background:#1f7a43e8}.toast.bad{background:#a4161ae8}.toast.gold{background:#b07a00ee}
+@keyframes tin{from{transform:translateY(-10px);opacity:0}}
+#updbar{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 12px;border-radius:12px;z-index:40;display:flex;gap:10px;align-items:center}
+/* online */
+.lb{width:100%;border-collapse:collapse;font-size:14px}
+.lb td,.lb th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.lb tr.mine{background:var(--amber2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#bbb;margin-right:4px}
+.dot.on{background:#2fbf63;box-shadow:0 0 6px #2fbf63}
+.chat{height:340px;overflow-y:auto;background:#faf8f5;border-radius:10px;padding:8px;border:1px solid var(--line);margin-bottom:8px}
+.msg{margin-bottom:6px}.msg b{color:var(--red2)}.msg .t{color:var(--mute);font-size:11px;margin-left:4px}
+.subtabs{display:flex;gap:6px;margin-bottom:10px}
+.subtabs button.on{background:var(--ink);color:#fff}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.kv b{text-align:right}
+.hearts{color:var(--red);font-size:12px}
+.code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
+.guide li{margin-bottom:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top"></header>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<div id="modal" class="hidden"></div>
+<div id="toasts"></div>
+<div id="updbar" class="hidden"></div>
+<script>
+'use strict';
+const GAME_BUILD = 202610311910; // ставиться build.py
+const CFG = window.GAME_CONFIG || {};
+const SAVE_KEY = 'np-save-v1';
+const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
+
+/* ---------- утиліти ---------- */
+const $ = s => document.querySelector(s);
+const rnd = (a,b) => a + Math.random()*(b-a);
+const ri = (a,b) => Math.floor(rnd(a,b+1));
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const pad = (n,l=2) => String(n).padStart(l,'0');
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Math.round(n).toLocaleString('uk-UA');
+const shuffle = a => { for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const hhmm = m => `${pad(Math.floor(m/60)%24)}:${pad(Math.floor(m%60))}`;
+const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
+
+/* ---------- дані ---------- */
+const SIZE_N = ['Конверт','S','M','L','XL'];
+const SIZE_CM = ['≈ 30×21 см, пласке','≈ 25×20×10 см','≈ 40×30×20 см','≈ 60×40×40 см','більше 60 см'];
+const ITEMS = [
+  {n:'Документи', e:'📄', s:0, w:[0.1,0.4]},
+  {n:'Телефон', e:'📱', s:1, w:[0.3,0.8], f:1},
+  {n:'Книжки', e:'📚', s:2, w:[1,4]},
+  {n:'Кросівки', e:'👟', s:2, w:[1,2]},
+  {n:'Одяг', e:'👕', s:1, w:[0.3,1.5]},
+  {n:'Банки з варенням', e:'🫙', s:2, w:[2,5], f:1},
+  {n:'Ноутбук', e:'💻', s:2, w:[2,3.5], f:1},
+  {n:'Іграшки', e:'🧸', s:2, w:[0.5,2]},
+  {n:'Розсада', e:'🌱', s:2, w:[1,3], f:1},
+  {n:'Мед', e:'🍯', s:1, w:[1,3], f:1},
+  {n:'Запчастини', e:'⚙️', s:3, w:[5,15]},
+  {n:'Шини', e:'🛞', s:4, w:[20,40], packed:1},
+  {n:'Мікрохвильовка', e:'📦', s:3, w:[10,14], f:1, packed:1},
+  {n:'Велосипед', e:'🚲', s:4, w:[12,18], packed:1},
+  {n:'Косметика', e:'💄', s:1, w:[0.3,1], f:1},
+  {n:'Посуд', e:'🍽️', s:2, w:[2,6], f:1},
+  {n:'Інструменти', e:'🔧', s:3, w:[4,10]},
+  {n:'Подарунок', e:'🎁', s:1, w:[0.5,2]},
+  {n:'Каструля', e:'🍲', s:2, w:[1.5,3]},
+  {n:'Картина', e:'🖼️', s:3, w:[2,5], f:1},
+  {n:'Чохол для телефону', e:'📲', s:0, w:[0.05,0.2]},
+  {n:'Кава в зернах', e:'☕', s:1, w:[0.5,1.5]},
+];
+const ITEM = n => ITEMS.find(i => i.n === n) || ITEMS[0];
+const CITIES = ['Київ','Львів','Одеса','Харків','Дніпро','Вінниця','Полтава','Чернігів','Ужгород','Івано-Франківськ','Тернопіль','Луцьк','Рівне','Житомир','Суми','Черкаси','Запоріжжя','Миколаїв','Кропивницький','Хмельницький','Чернівці','Херсон'];
+const OPS = ['050','063','066','067','068','073','093','095','096','097','098','099'];
+const NAMES_M = ['Олександр','Андрій','Сергій','Дмитро','Іван','Микола','Василь','Богдан','Тарас','Олег','Юрій','Роман','Віктор','Максим','Назар','Остап','Ігор','Степан'];
+const NAMES_F = ['Олена','Наталія','Ірина','Оксана','Тетяна','Марія','Світлана','Юлія','Галина','Христина','Софія','Анна','Людмила','Вікторія','Дарина','Леся','Зоряна'];
+const AV_M = ['👨','🧑','👨‍🦱','🧔','👴','👨‍🦰','🧑‍🦲','👱‍♂️'];
+const AV_F = ['👩','👩‍🦱','👱‍♀️','👩‍🦰','👵','👩‍🦳','🧕'];
+const GET_HI = ['Добрий день! Мені посилку отримати.','Вітаю, посилка прийшла, ось смс.','Здрастуйте, я по посилку.','Добрий! Мені по номеру телефону.','Привіт! Забрати хочу.'];
+const SEND_HI = ['Добрий день, хочу відправити','Здрастуйте, треба відправити','Вітаю! Відправлю','Добрий! Мені відправити'];
+const LEAVE_ANGRY = ['Та скільки можна чекати!','Піду на інше відділення!','Жах, а не обслуговування…','Все, я пішов!'];
+
+const REGS = [
+  {id:'galya', n:'Баба Галя', av:'👵', lvl:1, kind:'send', items:['Банки з варенням','Розсада','Мед'], hi:'Синочку, знов я! Онукам гостинці відправляю.', tip:20, pat:1.5, about:'Шле онукам варення і розсаду. Терпляча, але дуже не любить, коли б’ються банки.'},
+  {id:'max', n:'Студент Максим', av:'🧑‍🎓', lvl:2, kind:'get', hi:'Привіт! Мама знов передачку прислала 😅', tip:5, pat:0.8, about:'Отримує передачки з дому. Завжди поспішає на пари.'},
+  {id:'oksana', n:'Оксана «Своє Мило»', av:'👩‍💼', lvl:3, kind:'send', multi:3, items:['Косметика','Одяг','Подарунок'], hi:'Добрий! У мене сьогодні три відправки, швиденько?', tip:30, pat:1.0, about:'Має невеликий інтернет-магазин. Приносить кілька відправок одразу.'},
+  {id:'petro', n:'Дядько Петро', av:'🧔', lvl:4, kind:'get', big:1, hi:'Здоров! Запчастини мої прийшли?', tip:15, pat:1.0, about:'Ремонтує машини в гаражі, отримує важкі запчастини.'},
+  {id:'nina', n:'Пані Ніна', av:'👩‍🦳', lvl:5, kind:'get', hi:'Ой, доброго дня, зараз знайду номер… десь тут був…', tip:25, pat:1.7, about:'Найввічливіша клієнтка відділення. Завжди лишає чайові.'},
+  {id:'artem', n:'Айтішник Артем', av:'🧑‍💻', lvl:6, kind:'get', card:1, hi:'Привіт, мені по номеру, оплата карткою 👍', tip:40, pat:0.7, about:'Замовляє гаджети. Платить тільки карткою і не любить чекати.'},
+  {id:'iryna', n:'Ірина з малим', av:'👩‍👧', lvl:7, kind:'send', items:['Іграшки','Одяг'], hi:'Добрий день! Тільки швидше, бо малий вже капризує 🙈', tip:15, pat:0.6, about:'Продає дитячі речі, з якими малий вже не грається.'},
+  {id:'vasyl', n:'Фермер Василь', av:'👨‍🌾', lvl:8, kind:'send', items:['Мед','Банки з варенням'], hi:'Доброго здоров’ячка! Мед свіженький відправляю.', tip:35, pat:1.2, about:'Відправляє свій мед по всій Україні.'},
+];
+const REG = id => REGS.find(r => r.id === id);
+
+const TIERS = ['Пункт видачі','Відділення','Вантажне відділення','Сортувальний хаб'];
+const UPS = {
+  windows:{n:'Віконця', e:'🪟', start:1, costs:[1500,4000,9000], need:[2,4,7], d:l=>l<=1?'Одне віконце — тільки ваше. Персоналу видачі й прийому потрібне ще одне.':`Віконець: ${l}. На віконцях 2–${l} працює ваш персонал видачі й прийому.`},
+  shelves:{n:'Стелажі', e:'🗄️', start:1, costs:[800,2000,4500,9000], need:[1,3,5,8], d:l=>`${smallCount(l)} малих комірок і ${bigCount(l)} габаритних.`},
+  scanner:{n:'Сканер', e:'📟', start:0, costs:[1000,3500], need:[2,5], d:l=>['Звичайний пошук','Підсвічує потрібну комірку','Термінал сам знаходить номер телефону'][l]},
+  chairs:{n:'Зона очікування', e:'🪑', start:0, costs:[600,1800,4000], need:[1,3,6], d:l=>`Терпіння клієнтів +${l*20}%, черга до ${queueMax(l)} осіб.`},
+  cart:{n:'Рокла', e:'🛒', start:0, costs:[1200], need:[3], d:l=>l?'Великі посилки вивантажуються за 1 клік, склад працює на 30% швидше.':'Великі посилки треба тягати в кілька кліків.'},
+  coffee:{n:'Кавоапарат', e:'☕', start:0, costs:[2500], need:[4], d:l=>l?'Чайові +25%, терпіння +10%.':'Кава для клієнтів: більше чайових і терпіння.'},
+  ac:{n:'Кондиціонер', e:'❄️', start:0, costs:[3000], need:[5], d:l=>l?'Клієнти ставлять оцінку на 0,3 вищу.':'Прохолода у залі покращує оцінки.'},
+  ads:{n:'Вивіска і реклама', e:'📣', start:0, costs:[1000,3000,7000], need:[2,5,9], d:l=>`Клієнтів більше на ${l*15}%.`},
+  locker:{n:'Поштомат', e:'🟥', start:0, costs:[5000,9000,15000], need:[6,8,10], d:l=>l?`≈${l*12}% посилок забирають з поштомату (+12 ₴ за кожну, без черги).`:'Частину посилок клієнти заберуть самі.'},
+  tier:{n:'Розширення відділення', e:'🏢', start:0, costs:[6000,15000,35000], need:[5,10,15], d:l=>`${TIERS[l]}: клієнтів +${l*35}%, більші машини, до ${staffMax(l)} працівників.`},
+};
+const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', rest:'😴 Вихідний'};
+const PACK = [
+  {k:0, n:'Конверт', e:'✉️', price:10},
+  {k:1, n:'Коробка S', e:'📦', price:25},
+  {k:2, n:'Коробка M', e:'📦', price:40},
+  {k:3, n:'Коробка L', e:'📦', price:65},
+  {k:9, n:'Своє пакування', e:'🏷️', price:0},
+];
+
+/* ---------- стан ---------- */
+let G = null;          // збереження
+let FLOW = null;       // поточне обслуговування гравцем (не зберігається)
+let TAB = 'hall';
+let paused = false;
+let dirty = true;
+let lastT = performance.now();
+let ptrDown = 0; // час натискання: поки палець/миша натиснуті, не перемальовуємо екран, щоб клік не загубився
+document.addEventListener('pointerdown', () => { ptrDown = performance.now(); }, true);
+['pointerup','pointercancel'].forEach(ev => document.addEventListener(ev, () => setTimeout(() => { ptrDown = 0; }, 40), true));
+
+function blankToday(){ return {issued:0, sent:0, unloaded:0, earned:0, angry:0, served:0, satSum:0, returned:0, salaries:0, tips:0}; }
+function newGame(nick, branch){
+  return {v:1, nick, branch, pid:null, secret:null, day:1, time:480, phase:'night', money:1000, xp:0, level:1, rating:3.5,
+    stats:{issued:0, sent:0, unloaded:0, placed:0, earned:0, clients:0},
+    parcels:[], nid:1, queue:[], cid:1, truck:null, trucksDone:{}, hand:null,
+    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, tier:0},
+    staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
+}
+function migrate(g){
+  const d = newGame(g.nick || 'Оператор', g.branch || 'Відділення №1');
+  for (const k in d) if (g[k] === undefined) g[k] = d[k];
+  for (const k in d.up) if (g.up[k] === undefined) g.up[k] = d.up[k];
+  for (const k in d.stats) if (g.stats[k] === undefined) g.stats[k] = d.stats[k];
+  for (const k in d.today) if (g.today[k] === undefined) g.today[k] = d.today[k];
+  for (const k in d.settings) if (g.settings[k] === undefined) g.settings[k] = d.settings[k];
+  // клієнти, яких обслуговував гравець, повертаються в чергу
+  g.queue.forEach(c => { if (c.by === 'me') c.by = null; });
+  g.staff.forEach(s => { if (s.cl && !g.queue.some(c => c.id === s.cl)) s.cl = null; });
+  return g;
+}
+
+/* ---------- формули ---------- */
+const smallCount = (l=G.up.shelves) => 8 + l*8;
+const bigCount = (l=G.up.shelves) => 2 + l*2;
+const queueMax = (l=G.up.chairs) => 6 + l*2;
+const staffMax = (l=G.up.tier) => 2 + l*2;
+const needXp = l => Math.round(120*Math.pow(l,1.5));
+const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1);
+const satBonus = () => G.up.ac ? 0.3 : 0;
+const tipMul = () => G.up.coffee ? 1.25 : 1;
+const serveT = s => 16 - s.lvl*2;            // сек на клієнта
+const storeIv = s => (4 - s.lvl*0.5) * (G.up.cart ? 0.7 : 1);
+const errCh = s => 0.12 - s.lvl*0.02;
+const trainCost = s => 400*s.lvl;
+const sendPrice = (w, f) => 60 + Math.round(15*w) + (f ? 20 : 0);
+const smallCell = s => s <= 2;
+
+function cellsList(){
+  const small = [], big = [];
+  const n = smallCount();
+  for (let i=0;i<n;i++) small.push(`${Math.floor(i/8)+1}-${pad(i%8+1)}`);
+  for (let i=0;i<bigCount();i++) big.push(`Г-${pad(i+1)}`);
+  return {small, big};
+}
+function cellLoad(){
+  const m = {};
+  for (const p of G.parcels) if (p.state === 'cell') m[p.cell] = (m[p.cell]||0) + 1;
+  return m;
+}
+function targetCell(p){
+  const {small, big} = cellsList();
+  const list = smallCell(p.s) ? small : big;
+  const cap = smallCell(p.s) ? 3 : 2;
+  const load = cellLoad();
+  let best = Infinity, opts = [];
+  for (const c of list){ const l = load[c]||0; if (l >= cap) continue; if (l < best){ best = l; opts = [c]; } else if (l === best) opts.push(c); }
+  return opts.length ? pick(opts) : null;
+}
+
+/* ---------- звук ---------- */
+let AC = null;
+function beep(f=1800, d=0.08, type='square', v=0.05){
+  if (!G || !G.settings.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = f; g.gain.value = v;
+    o.connect(g); g.connect(AC.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + d);
+    o.stop(AC.currentTime + d + 0.02);
+  } catch(e){}
+}
+const sScan = () => beep(1900, 0.09);
+const sErr = () => beep(180, 0.25, 'sawtooth', 0.06);
+const sCash = () => { beep(1320, 0.08, 'triangle', 0.08); setTimeout(() => beep(1760, 0.15, 'triangle', 0.08), 90); };
+const sBell = () => { beep(880, 0.2, 'sine', 0.06); };
+
+/* ---------- тости ---------- */
+function toast(t, cls=''){
+  const d = document.createElement('div');
+  d.className = 'toast ' + cls; d.innerHTML = t;
+  $('#toasts').appendChild(d);
+  setTimeout(() => d.remove(), 2600);
+  while ($('#toasts').children.length > 4) $('#toasts').firstChild.remove();
+}
+
+/* ---------- генерація ---------- */
+function phone(){ return `${pick(OPS)} ${ri(100,999)} ${pad(ri(0,99))} ${pad(ri(0,99))}`; }
+function ttn(){ return '2045' + ri(1000000000, 9999999999); }
+function person(){
+  const f = Math.random() < 0.5;
+  return {name: `${pick(f?NAMES_F:NAMES_M)} ${'АБВГДЗКЛМНОПРСТФШ'[ri(0,16)]}.`, av: pick(f?AV_F:AV_M)};
+}
+function regInfo(id){
+  if (!G.regs[id]) G.regs[id] = {met:false, hearts:0, visits:0, phone:phone()};
+  return G.regs[id];
+}
+function makeParcel(opts={}){
+  const it = opts.item || pick(ITEMS);
+  const p = {id:G.nid++, ttn:ttn(), item:it.n, e:it.e, s:it.s, w:+rnd(it.w[0], it.w[1]).toFixed(1), f:it.f?1:0,
+    cod: Math.random() < 0.4 ? ri(2,40)*25 : 0, phone: opts.phone || phone(), name: opts.name || person().name,
+    city: pick(CITIES), state: opts.state || 'truck', cell:null, reg: opts.reg || null, unl:0, inDay:0, inT:0};
+  G.parcels.push(p);
+  return p;
+}
+function truckArrive(kind){
+  const leave = {m:600, d:870, e:1185}[kind];
+  if (kind === 'e'){
+    G.truck = {kind:'out', leaveAt:leave, key:kind};
+    sBell(); toast('🚚 Приїхала вечірня машина — завантаж відправлення!', 'gold');
+  } else {
+    let n = ri(6,9) + G.level + G.up.tier*4;
+    if (kind === 'd') n = Math.max(3, Math.round(n*0.6));
+    const ids = [];
+    // посилки постійним клієнтам
+    for (const r of REGS) if (r.kind === 'get' && G.level >= r.lvl && Math.random() < 0.4){
+      const ri_ = regInfo(r.id);
+      const it = r.big ? pick(ITEMS.filter(i => i.s >= 3)) : pick(ITEMS.filter(i => i.s <= 2));
+      ids.push(makeParcel({item:it, phone:ri_.phone, name:r.n, reg:r.id}).id);
+    }
+    for (let i=0;i<n;i++){
+      const p = makeParcel();
+      ids.push(p.id);
+      if (Math.random() < 0.15 && i < n-1){ ids.push(makeParcel({phone:p.phone, name:p.name}).id); i++; }
+    }
+    G.truck = {kind:'in', leaveAt:leave, key:kind};
+    sBell(); toast(`🚚 Приїхала машина: ${ids.length} посилок на розвантаження!`, 'gold');
+  }
+  G.trucksDone[kind] = 1;
+  dirty = true;
+}
+function truckLeave(){
+  const t = G.truck; if (!t) return;
+  if (t.kind === 'in'){
+    const left = G.parcels.filter(p => p.state === 'truck');
+    if (left.length){
+      G.parcels = G.parcels.filter(p => p.state !== 'truck');
+      G.rating = clamp(G.rating - 0.03*left.length, 1, 5);
+      G.today.returned += left.length;
+      toast(`😬 Машина поїхала, ${left.length} посилок не розвантажено — повертаються на сортування`, 'bad');
+    }
+  } else {
+    const loaded = G.parcels.filter(p => p.state === 'loaded').length;
+    G.parcels = G.parcels.filter(p => p.state !== 'loaded');
+    const notL = G.parcels.filter(p => p.state === 'outgoing').length;
+    if (notL){ G.rating = clamp(G.rating - 0.02*notL, 1, 5); toast(`🚚 Поїхала з ${loaded} відправленнями. Залишилось ${notL} — поїдуть завтра (рейтинг ↓)`, 'bad'); }
+    else if (loaded) toast(`🚚 Машина поїхала: ${loaded} відправлень в дорозі!`, 'good');
+  }
+  G.truck = null; dirty = true;
+}
+
+/* ---------- клієнти ---------- */
+function readyParcels(){
+  return G.parcels.filter(p => p.state === 'cell' && !p.res && (p.inDay < G.day || G.time - p.inT >= 20));
+}
+function spawnClient(force){
+  if (G.queue.length >= queueMax()) return;
+  const avail = readyParcels();
+  const unlocked = REGS.filter(r => G.level >= r.lvl && !G.queue.some(c => c.reg === r.id));
+  let reg = null;
+  const regPool = unlocked.filter(r => r.kind === 'send' || avail.some(p => p.reg === r.id));
+  if (regPool.length && (Math.random() < 0.22 || regPool.some(r => r.kind==='get' && avail.some(p => p.reg===r.id) && Math.random() < 0.15))) reg = pick(regPool);
+  const plain = avail.filter(p => !p.reg);
+  const kind = reg ? reg.kind : (plain.length && Math.random() < 0.62 ? 'get' : 'send');
+  const pp = reg ? {name:reg.n, av:reg.av} : person();
+  const c = {id:G.cid++, kind, name:pp.name, av:pp.av, reg: reg ? reg.id : null, by:null, pids:[], items:[]};
+  const regMul = reg ? reg.pat : 1;
+  c.max = c.pat = rnd(45, 65) * patMul() * regMul;
+  c.card = reg && reg.card ? true : Math.random() < 0.5;
+  if (kind === 'get'){
+    const pool = reg ? avail.filter(p => p.reg === reg.id) : plain;
+    const p0 = pick(pool);
+    const group = avail.filter(p => p.phone === p0.phone);
+    if (!reg && G.up.locker && Math.random() < G.up.locker*0.12){
+      group.forEach(p => { p.state = 'gone'; });
+      G.parcels = G.parcels.filter(p => p.state !== 'gone');
+      addMoney(12*group.length); G.stats.issued += group.length; G.today.issued += group.length;
+      if (Math.random() < 0.4) toast(`🟥 ${esc(pp.name)} забрав(ла) посилку з поштомату (+${12*group.length} ₴)`);
+      dirty = true; return;
+    }
+    c.phone = p0.phone; c.pids = group.map(p => p.id);
+    group.forEach(p => p.res = c.id);
+    c.hi = reg ? reg.hi : pick(GET_HI);
+  } else {
+    const n = reg && reg.multi ? reg.multi : (Math.random() < 0.12 ? 2 : 1);
+    for (let i=0;i<n;i++){
+      const it = reg ? ITEM(pick(reg.items)) : pick(ITEMS);
+      c.items.push({item:it.n, e:it.e, s:it.s, f:it.f?1:0, packed:it.packed?1:0, w:+rnd(it.w[0], it.w[1]).toFixed(1), city:pick(CITIES)});
+    }
+    c.hi = reg ? reg.hi : pick(SEND_HI);
+  }
+  if (reg){
+    const info = regInfo(reg.id);
+    if (!info.met){ info.met = true; toast(`⭐ Новий постійний клієнт: ${reg.av} ${reg.n}!`, 'gold'); }
+  }
+  G.queue.push(c); G.stats.clients++;
+  dirty = true;
+}
+function removeClient(c){
+  G.queue = G.queue.filter(x => x.id !== c.id);
+  G.parcels.forEach(p => { if (p.res === c.id) p.res = null; });
+  G.staff.forEach(s => { if (s.cl === c.id) s.cl = null; });
+  dirty = true;
+}
+function rate(sat, c){
+  sat = clamp(sat + satBonus(), 1, 5);
+  G.rating = clamp(G.rating + (sat - G.rating)*0.06, 1, 5);
+  G.today.served++; G.today.satSum += sat;
+  if (c && c.reg){
+    const info = regInfo(c.reg); info.visits++;
+    if (sat >= 4) info.hearts = Math.min(5, info.hearts + 1);
+    else if (sat < 3) info.hearts = Math.max(0, info.hearts - 1);
+  }
+  return sat;
+}
+function tipFor(c, sat){
+  if (!c.reg || sat < 4) return 0;
+  const r = REG(c.reg), info = regInfo(c.reg);
+  return Math.round(r.tip * (1 + info.hearts*0.3) * tipMul());
+}
+function clientLeftAngry(c){
+  if (FLOW && FLOW.cid === c.id){ FLOW = null; closeModal(); }
+  removeClient(c);
+  rate(1, c);
+  G.today.angry++;
+  sErr();
+  toast(`😠 ${esc(c.name)}: «${pick(LEAVE_ANGRY)}»`, 'bad');
+}
+
+/* ---------- гроші та досвід ---------- */
+function addMoney(n){ G.money += n; if (n > 0){ G.stats.earned += n; G.today.earned += n; } dirty = true; }
+function addXp(n){
+  G.xp += n;
+  while (G.xp >= needXp(G.level)){
+    G.xp -= needXp(G.level); G.level++;
+    const unl = [];
+    for (const k in UPS){ const u = UPS[k]; if (u.need.includes(G.level)) unl.push(`${u.e} ${u.n}`); }
+    REGS.filter(r => r.lvl === G.level).forEach(r => unl.push(`${r.av} постійний клієнт: ${r.n}`));
+    sCash();
+    showLevelUp(unl);
+  }
+  dirty = true;
+}
+
+/* ---------- персонал ---------- */
+function genCand(){
+  const p = person();
+  const lvl = Math.random() < 0.6 ? 1 : Math.random() < 0.75 ? 2 : 3;
+  return {id:G.sid++, name:p.name, av:p.av, lvl, salary: 250 + lvl*120 + ri(0,6)*10, role:'store', t:0, cl:null, training:0, done:0};
+}
+function refreshCand(){ G.cand = [genCand(), genCand(), genCand()]; G.candDay = G.day; }
+function frontBusy(){ return G.staff.filter(s => s.cl).length; }
+function staffTick(dt){
+  for (const s of G.staff){
+    if (s.training || s.role === 'rest'){ s.cl = null; continue; }
+    if (s.role === 'store'){
+      s.t += dt;
+      if (s.t >= storeIv(s)){ s.t = 0; storeAction(s); }
+    } else {
+      if (!s.cl){
+        if (frontBusy() >= G.up.windows - 1) { s.idle = 'no-window'; continue; }
+        const want = s.role === 'issue' ? 'get' : 'send';
+        const c = G.queue.find(c => !c.by && c.kind === want);
+        s.idle = c ? null : 'no-clients';
+        if (c){ c.by = s.id; s.cl = c.id; s.t = 0; dirty = true; }
+      } else {
+        s.t += dt;
+        if (s.t >= serveT(s)) staffFinish(s);
+      }
+    }
+  }
+}
+function staffFinish(s){
+  const c = G.queue.find(c => c.id === s.cl); s.cl = null; s.t = 0;
+  if (!c) return;
+  const err = Math.random() < errCh(s);
+  let money = 0, n = 0;
+  if (c.kind === 'get'){
+    const ps = G.parcels.filter(p => c.pids.includes(p.id));
+    n = ps.length;
+    money = ps.reduce((a,p) => a + 15 + Math.round(p.cod*0.02), 0);
+    G.parcels = G.parcels.filter(p => !c.pids.includes(p.id));
+    G.stats.issued += n; G.today.issued += n;
+  } else {
+    for (const it of c.items){
+      const pk = PACK.find(x => x.k === (it.packed ? 9 : it.s)) || PACK[0];
+      money += sendPrice(it.w, it.f) + (it.s >= 4 ? 0 : pk.price);
+      const p = makeParcel({item:ITEM(it.item), state:'outgoing'}); p.w = it.w; p.city = it.city;
+      n++;
+    }
+    G.stats.sent += n; G.today.sent += n;
+  }
+  removeClient(c);
+  const sat = rate(err ? 2 : 4 + (Math.random() < 0.3 ? 1 : 0), c);
+  const tip = tipFor(c, sat);
+  addMoney(Math.round(money*0.9) + tip); G.today.tips += tip;
+  addXp(4*n);
+  if (err) toast(`⚠️ ${esc(s.name)} помилилась(вся) з клієнтом — оцінка низька`, 'bad');
+}
+function storeAction(s){
+  const truckBox = G.parcels.find(p => p.state === 'truck');
+  if (truckBox){ truckBox.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; dirty = true; return; }
+  const pile = G.parcels.filter(p => p.state === 'pile' && p.id !== G.hand);
+  for (const p of pile){
+    const cell = targetCell(p);
+    if (cell){ placeParcel(p, cell, true); return; }
+  }
+  if (G.truck && G.truck.kind === 'out'){
+    const o = G.parcels.find(p => p.state === 'outgoing');
+    if (o){ o.state = 'loaded'; dirty = true; }
+  }
+}
+function placeParcel(p, cell, byStaff){
+  p.state = 'cell'; p.cell = cell; p.inDay = G.day; p.inT = G.time; p.target = null;
+  if (G.hand === p.id) G.hand = null;
+  G.stats.placed++;
+  if (!byStaff){ addXp(2); }
+  dirty = true;
+}
+
+/* ---------- день ---------- */
+function startDay(){
+  G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null;
+  if (G.candDay < G.day || !G.cand.length) refreshCand();
+  truckArrive('m');
+  TAB = 'ramp';
+  if (!G.seenGuide) showGuide();
+  save(); dirty = true;
+}
+function endDay(){
+  if (FLOW) closeModal();
+  if (G.truck) truckLeave();
+  for (const c of [...G.queue]) removeClient(c);
+  G.queue = [];
+  // зарплати
+  let sal = 0;
+  for (const s of G.staff) if (s.role !== 'rest') sal += s.salary;
+  G.money -= sal; G.today.salaries = sal;
+  // навчання
+  const trained = [];
+  for (const s of G.staff) if (s.training && s.training <= G.day){ s.training = 0; s.lvl = Math.min(5, s.lvl + 1); trained.push(s); }
+  // термін зберігання 5 днів
+  const old = G.parcels.filter(p => p.state === 'cell' && G.day - p.inDay >= 5);
+  if (old.length){ G.parcels = G.parcels.filter(p => !old.includes(p)); G.rating = clamp(G.rating - 0.02*old.length, 1, 5); }
+  const sum = {...G.today, day:G.day, expired:old.length, trained};
+  G.day++; G.phase = 'night'; G.time = 480;
+  refreshCand();
+  save(); cloudSave(true);
+  showDaySummary(sum);
+  dirty = true;
+}
+
+/* ---------- головний цикл ---------- */
+function tick(){
+  const now = performance.now();
+  let dt = Math.min(0.5, (now - lastT)/1000); lastT = now;
+  if (!G) return;
+  if (G.phase === 'day' && !paused){
+    const sp = G.settings.speed;
+    dt *= sp;
+    const prev = G.time;
+    G.time += dt*MIN_PER_SEC;
+    const dMin = G.time - prev;
+    if (prev < 780 && G.time >= 780 && !G.trucksDone.d){ if (G.truck) truckLeave(); truckArrive('d'); }
+    if (prev < 1080 && G.time >= 1080 && !G.trucksDone.e){ if (G.truck) truckLeave(); truckArrive('e'); }
+    if (G.truck && G.time >= G.truck.leaveAt) truckLeave();
+    // нові клієнти
+    if (G.time < 1170){
+      const h = G.time/60;
+      const tf = h < 10 ? 0.7 : h < 12 ? 1 : h < 14 ? 1.4 : h < 17 ? 1 : h < 19 ? 1.5 : 0.6;
+      const lam = (0.03 + G.level*0.004) * (1 + G.up.ads*0.15) * (1 + G.up.tier*0.35) * tf * (0.5 + G.rating/7);
+      if (Math.random() < lam*dMin) spawnClient();
+    }
+    // терпіння
+    for (const c of [...G.queue]){
+      if (c.by && c.by !== 'me') continue;
+      c.pat -= dt * (c.by === 'me' ? 0.3 : 1);
+      if (c.pat <= 0) clientLeftAngry(c);
+    }
+    staffTick(dt);
+    if (G.time >= 1200) endDay();
+  }
+  if (dirty && (!ptrDown || now - ptrDown > 1200)){ dirty = false; render(); } else liveUpdate();
+}
+
+/* ---------- рендер ---------- */
+function renderTop(){
+  const xp = needXp(G.level);
+  const tod = G.phase === 'day' ? `🕐 <span class="clock" id="clk">${hhmm(G.time)}</span>` : '🌙 Ніч';
+  $('#top').innerHTML = `
+  <div class="toprow">
+    <div class="logo"><span class="lbox">НП</span> Наша Пошта</div>
+    <div class="branch">${esc(G.branch)} · ${TIERS[G.up.tier]}</div>
+    <div class="sp"></div>
+    <span class="pill">День ${G.day}</span>
+    <span class="pill">${tod}</span>
+    <span class="pill" id="money">💰 ${fmt(G.money)} ₴</span>
+    <span class="pill" title="Рейтинг відділення">⭐ <span id="rat">${G.rating.toFixed(2)}</span></span>
+    <span class="pill">Рів. ${G.level}</span>
+    ${G.phase==='day' ? `<button class="topbtn" data-act="pause" title="Пауза">${paused?'▶️':'⏸️'}</button>
+    <button class="topbtn" data-act="speed" title="Швидкість">⏩×${G.settings.speed}</button>` : ''}
+    <button class="topbtn" data-act="savenow" title="Зберегти">💾</button>
+    <button class="topbtn" data-act="guide" title="Як грати">❓</button>
+    <button class="topbtn" data-act="settings" title="Налаштування">⚙️</button>
+  </div>
+  <div class="xpbar"><i style="width:${(G.xp/xp*100).toFixed(1)}%"></i></div>`;
+}
+function renderTabs(){
+  const pile = G.parcels.filter(p => p.state === 'pile').length;
+  const tr = G.parcels.filter(p => p.state === 'truck').length + (G.truck && G.truck.kind==='out' ? G.parcels.filter(p=>p.state==='outgoing').length : 0);
+  const free = G.queue.filter(c => !c.by).length;
+  const T = [['hall','🏢','Зал', free],['store','📦','Склад', pile],['ramp','🚚','Рампа', G.truck ? tr || '!' : 0],['staff','👥','Персонал',0],['ups','🔧','Покращення', affordableUps()],['online','🌐','Онлайн', NET.unread]];
+  $('#tabs').innerHTML = T.map(([k,i,n,b]) => `<button class="${TAB===k?'on':''}" data-tab="${k}"><span class="ti">${i}</span>${n}${b?`<span class="badge">${b}</span>`:''}</button>`).join('');
+}
+function render(){
+  if (!G) return;
+  renderTop(); renderTabs();
+  const v = $('#view');
+  const fn = {hall:viewHall, store:viewStore, ramp:viewRamp, staff:viewStaff, ups:viewUps, online:viewOnline}[TAB];
+  const scroll = window.scrollY;
+  v.innerHTML = fn();
+  if (TAB === 'online') afterOnline();
+  window.scrollTo(0, scroll);
+}
+function liveUpdate(){
+  const clk = $('#clk'); if (clk && G.phase === 'day') clk.textContent = hhmm(G.time);
+  document.querySelectorAll('[data-pat]').forEach(el => {
+    const c = G.queue.find(c => c.id === +el.dataset.pat); if (!c) return;
+    const r = clamp(c.pat/c.max, 0, 1);
+    el.style.width = (r*100).toFixed(1) + '%';
+    el.style.background = r > 0.5 ? 'var(--green)' : r > 0.25 ? 'var(--amber)' : 'var(--red)';
+  });
+  document.querySelectorAll('[data-sprog]').forEach(el => {
+    const s = G.staff.find(s => s.id === +el.dataset.sprog); if (!s) return;
+    el.style.width = s.cl ? clamp(s.t/serveT(s)*100, 0, 100).toFixed(0) + '%' : '0%';
+  });
+  const tl = $('#truckleft'); if (tl && G.truck) tl.textContent = hhmm(G.truck.leaveAt);
+}
+function clientHTML(c){
+  const r = clamp(c.pat/c.max, 0, 1);
+  const who = c.by === 'me' ? '<div class="who">у вас</div>' : c.by ? `<div class="who">${esc((G.staff.find(s=>s.id===c.by)||{}).name||'')}</div>` : '';
+  const kd = c.kind === 'get' ? `📥 отримати${c.pids.length>1?' ×'+c.pids.length:''}` : `📤 відправити${c.items.length>1?' ×'+c.items.length:''}`;
+  return `<div class="client ${c.reg?'reg':''} ${c.by==='me'?'me':''}" data-act="${c.by?'':'serve'}" data-id="${c.id}">
+    <div class="av">${c.av}</div><div class="nm">${esc(c.name)}</div><div class="kd">${kd}</div>${who}
+    ${c.by && c.by!=='me' ? '' : `<div class="pat"><i data-pat="${c.id}" style="width:${r*100}%"></i></div>`}</div>`;
+}
+function viewHall(){
+  if (G.phase === 'night'){
+    return `<div class="card bigstart"><div class="e">🏤</div><h2>Відділення зачинене</h2>
+      <p class="mute">Вночі можна найняти персонал, відправити когось на навчання і купити покращення.</p>
+      <button class="pri" data-act="startday" style="font-size:18px;padding:14px 28px">🔑 Відкрити відділення · День ${G.day}</button></div>
+      ${regsCard()}`;
+  }
+  const free = G.queue.filter(c => !c.by);
+  const front = G.staff.filter(s => (s.role==='issue'||s.role==='accept') && !s.training);
+  let wins = `<div class="win act"><div class="wt">Віконце 1 · Ви</div>
+     ${FLOW ? '<div class="mute">Обслуговуєте клієнта…</div><button class="sm" data-act="reopen">Продовжити</button>' :
+       free.length ? `<button class="pri" data-act="serve" data-id="${free[0].id}">🔔 Наступний!</button>` : '<div class="mute">Черги немає ☕</div>'}</div>`;
+  for (let w=2; w<=G.up.windows; w++){
+    const s = G.staff.filter(s => s.cl)[w-2] || null;
+    wins += `<div class="win ${s?'act':''}"><div class="wt">Віконце ${w}</div>${s ? `<div>${s.av} ${esc(s.name)}</div><div class="pat"><i data-sprog="${s.id}" style="width:0;background:var(--blue)"></i></div>` :
+      `<div class="mute">${front.length ? 'вільне' : 'немає працівника видачі/прийому'}</div>`}</div>`;
+  }
+  const t = G.today;
+  return `<div class="card"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
+    <div class="queue">${G.queue.length ? G.queue.map(clientHTML).join('') : '<div class="mute" style="padding:30px 6px">Поки нікого… Розклади посилки по комірках, щоб клієнти могли їх забрати.</div>'}</div>
+    <div class="counter"></div>
+    <div class="windows">${wins}</div></div>
+    <div class="card"><h3>📊 Сьогодні</h3><div class="row mute">
+      <span>📥 видано: <b>${t.issued}</b></span><span>📤 прийнято: <b>${t.sent}</b></span><span>🚚 розвантажено: <b>${t.unloaded}</b></span>
+      <span>💰 зароблено: <b>${fmt(t.earned)} ₴</b></span><span>😠 пішли: <b>${t.angry}</b></span></div>
+      <div class="mute" style="margin-top:6px">🚚 Машини: 08:00 і 13:00 привозять посилки · 18:00 забирає відправлення · 20:00 кінець зміни</div></div>
+    ${regsCard()}`;
+}
+function regsCard(){
+  const met = REGS.filter(r => G.regs[r.id] && G.regs[r.id].met);
+  const next = REGS.find(r => r.lvl > G.level);
+  if (!met.length && !next) return '';
+  return `<div class="card"><h3>⭐ Постійні клієнти</h3>
+    ${met.map(r => { const i = G.regs[r.id]; return `<div class="row" style="margin-bottom:6px"><span style="font-size:26px">${r.av}</span><div style="flex:1"><b>${r.n}</b> <span class="hearts">${'❤'.repeat(i.hearts)}${'♡'.repeat(5-i.hearts)}</span><div class="mute">${r.about} Візитів: ${i.visits}</div></div></div>`; }).join('') || '<div class="mute">Ще ніхто не став постійним. Вони з’являться з ростом рівня.</div>'}
+    ${next ? `<div class="mute">🔒 Наступний постійний клієнт відкриється на ${next.lvl} рівні.</div>` : ''}</div>`;
+}
+function rackHTML(mode, needCells=[], pickedCells=[]){
+  const {small, big} = cellsList();
+  const load = cellLoad();
+  const hand = G.parcels.find(p => p.id === G.hand);
+  const glowSet = new Set();
+  if (G.up.scanner >= 1){
+    if (mode === 'place' && hand && hand.target) glowSet.add(hand.target);
+    if (mode === 'fetch') needCells.forEach(c => { if (!pickedCells.includes(c)) glowSet.add(c); });
+  }
+  const cellBtn = (id, cap) => {
+    const l = load[id]||0;
+    return `<div class="cell ${glowSet.has(id)?'glow':''} ${l>=cap?'full':''} ${pickedCells.includes(id)?'picked':''}" data-act="${mode==='fetch'?'fetchcell':'cell'}" data-id="${id}">
+      <span>${id}</span><span class="dots">${'■'.repeat(l)}${'□'.repeat(cap-l)}</span></div>`;
+  };
+  let h = '<div class="racks">';
+  for (let r=0; r<small.length/8; r++){
+    h += `<div class="rack"><div class="rt">Стелаж ${r+1}</div><div class="cells">${small.slice(r*8, r*8+8).map(id => cellBtn(id,3)).join('')}</div></div>`;
+  }
+  h += `<div class="rack big"><div class="rt">Габарит</div><div class="cells">${big.map(id => cellBtn(id,2)).join('')}</div></div></div>`;
+  return h;
+}
+function parcelHTML(p, act){
+  return `<div class="parcel s${p.s} ${G.hand===p.id?'sel':''}" data-act="${act}" data-id="${p.id}">
+    <div class="pe">${p.e}</div><div class="tag">${SIZE_N[p.s]} · ${p.w} кг</div>${p.f?'<div class="tag fr">⚠ КРИХКЕ</div>':''}<div class="tag">…${String(p.ttn).slice(-4)}</div></div>`;
+}
+function viewStore(){
+  const pile = G.parcels.filter(p => p.state === 'pile');
+  const hand = G.parcels.find(p => p.id === G.hand);
+  const out = G.parcels.filter(p => p.state === 'outgoing' || p.state === 'loaded');
+  const inCells = G.parcels.filter(p => p.state === 'cell').length;
+  const term = hand ? `📟 ТТН <b>${hand.ttn}</b> · ${SIZE_N[hand.s]} · ${hand.w} кг<br>➡ Розмістити в комірку: <b style="font-size:18px">${hand.target || 'НЕМАЄ МІСЦЯ'}</b>`
+    : pile.length ? '📟 Візьми посилку з розбору, щоб відсканувати її' : '📟 Розбір порожній. Чекай на машину або видавай посилки 👍';
+  return `<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
+      <div class="terminal">${term}</div>
+      <div class="pile">${pile.map(p => parcelHTML(p, 'take')).join('') || '<span class="mute">Порожньо</span>'}</div></div>
+    <div class="card"><h3>🗄️ Комірки <span class="mute">(${inCells} посилок)</span></h3>
+      <div class="mute" style="margin-bottom:8px">${hand ? 'Натисни на потрібну комірку.' : 'Натисни на комірку, щоб подивитись, що в ній.'} ■ = посилка в комірці.</div>
+      ${rackHTML('place')}</div>
+    <div class="card"><h3>📤 Відправлення <span class="mute">(${out.length})</span></h3>
+      <div class="mute">Прийняті посилки чекають на вечірню машину (18:00). Завантажити їх можна на вкладці «Рампа».</div>
+      <div class="pile" style="margin-top:6px">${out.map(p => `<div class="parcel s${p.s}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${p.state==='loaded'?'<div class="tag">✅ в машині</div>':''}</div>`).join('')}</div></div>`;
+}
+function viewRamp(){
+  if (G.phase === 'night') return `<div class="card bigstart"><div class="e">🌙</div><p class="mute">Машини приїдуть зранку о 08:00.</p></div>`;
+  const t = G.truck;
+  const next = [['m',480,'08:00','привозить посилки'],['d',780,'13:00','привозить посилки'],['e',1080,'18:00','забирає відправлення']].filter(x => !G.trucksDone[x[0]]);
+  if (!t) return `<div class="card bigstart"><div class="e">🅿️</div><h3 style="justify-content:center">Рампа вільна</h3>
+     <p class="mute">${next.length ? 'Наступна машина: ' + next.map(x => `<b>${x[2]}</b> (${x[3]})`).join(', ') : 'Сьогодні машин більше не буде.'}</p></div>`;
+  if (t.kind === 'in'){
+    const boxes = G.parcels.filter(p => p.state === 'truck');
+    return `<div class="truck"><div class="truckcab"><span class="te">🚚</span><div><b>Машина з посилками</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span> — встигни розвантажити все! Великі коробки треба тягнути кілька разів${G.up.cart?' (з роклою — один)':''}.</div></div></div>
+      <div class="truckbody">${boxes.map(p => { const need = G.up.cart ? 1 : p.s>=4?3:p.s===3?2:1; return `<div class="box s${p.s}" data-act="unload" data-id="${p.id}">${p.e}<span>${SIZE_N[p.s]}</span>${need>1?`<div class="pr"><i style="width:${p.unl/need*100}%"></i></div>`:''}</div>`; }).join('') || '<div class="mute" style="padding:30px">✅ Все розвантажено! Машина скоро поїде.</div>'}</div>
+      ${boxes.length ? `<div style="margin-top:8px"><button class="ghost sm" data-act="unloadall">Розвантажити все швидко (−${boxes.length} хв)</button></div>` : ''}</div>`;
+  }
+  const out = G.parcels.filter(p => p.state === 'outgoing');
+  const loaded = G.parcels.filter(p => p.state === 'loaded');
+  return `<div class="truck"><div class="truckcab"><span class="te">🚛</span><div><b>Вечірня машина за відправленнями</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span>. Натискай на посилки, щоб завантажити.</div></div></div>
+    <div class="mute">На відправку:</div><div class="pile" style="margin:6px 0 10px">${out.map(p => `<div class="parcel s${p.s}" data-act="load" data-id="${p.id}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div></div>`).join('') || '<span class="mute">Все завантажено ✅</span>'}</div>
+    <div class="truckbody">${loaded.map(p => `<div class="box s${p.s}">${p.e}<span>${p.city.slice(0,8)}</span></div>`).join('')}</div></div>`;
+}
+function viewStaff(){
+  const max = staffMax();
+  const staff = G.staff.map(s => `<div class="card staff"><div class="av">${s.av}</div><div style="flex:1">
+      <b>${esc(s.name)}</b> <span class="stars">${stars(s.lvl)}</span>
+      <div class="mute">Зарплата ${s.salary} ₴/день · ${s.training ? '📚 На навчанні до кінця дня ' + s.training : s.role==='store' ? `розкладає посилку кожні ${storeIv(s).toFixed(1)} с` : s.role==='rest' ? 'Вихідний (без зарплати)' : `обслуговує клієнта за ${serveT(s)} с, помилки ${Math.round(errCh(s)*100)}%`}</div>
+      ${s.training ? '' : `<div class="roles">${Object.entries(ROLES).map(([k,n]) => `<button class="${s.role===k?'on':''}" data-act="role" data-id="${s.id}" data-role="${k}">${n}</button>`).join('')}</div>`}
+      <div class="row" style="margin-top:6px">
+        ${s.lvl < 5 && !s.training ? `<button class="sm" data-act="train" data-id="${s.id}">📚 Навчання · ${fmt(trainCost(s))} ₴</button>` : ''}
+        <button class="sm ghost" data-act="fire" data-id="${s.id}">Звільнити</button></div></div></div>`).join('');
+  const cand = G.cand.map(s => `<div class="card staff"><div class="av">${s.av}</div><div style="flex:1"><b>${esc(s.name)}</b> <span class="stars">${stars(s.lvl)}</span>
+      <div class="mute">Хоче ${s.salary} ₴/день</div><button class="ok sm" style="margin-top:6px" data-act="hire" data-id="${s.id}" ${G.staff.length>=max?'disabled':''}>Найняти</button></div></div>`).join('');
+  const sal = G.staff.reduce((a,s) => a + (s.role==='rest'?0:s.salary), 0);
+  return `<div class="card"><h3>👥 Персонал <span class="mute">(${G.staff.length}/${max})</span></h3>
+     <div class="mute">Зарплати: <b>${fmt(sal)} ₴</b> в кінці кожного дня. Видача і прийом потребують вільних віконець (зараз ${G.up.windows}, перше — ваше). Склад розвантажує машину, розкладає посилки і вантажить відправлення. Навчання триває до кінця дня, і працівник у цей час не працює.</div></div>
+     ${staff || '<div class="card mute">Поки працюєте самі. Найміть когось, щоб було легше!</div>'}
+     <div class="card"><h3>🧾 Кандидати <span class="mute">(оновлюються щодня)</span></h3>${G.staff.length>=max?'<div class="mute">Більше місць немає — розширте відділення.</div>':''}</div>
+     <div class="grid2">${cand}</div>`;
+}
+function upNext(k){ const u = UPS[k]; const i = G.up[k] - u.start; return i < u.costs.length ? {cost:u.costs[i], need:u.need[i]} : null; }
+function affordableUps(){ let n = 0; for (const k in UPS){ const nx = upNext(k); if (nx && G.level >= nx.need && G.money >= nx.cost) n++; } return n; }
+function viewUps(){
+  return `<div class="ups">${Object.entries(UPS).map(([k,u]) => {
+    const l = G.up[k], nx = upNext(k), max = u.start + u.costs.length;
+    const bars = Array.from({length:max}, (_,i) => `<i class="${i < l ? 'on' : ''}"></i>`).join('');
+    return `<div class="card up"><div class="row"><span class="ue">${u.e}</span><div style="flex:1"><b>${u.n}</b><div class="mute">рівень ${l}/${max}</div></div></div>
+      <div class="lvl">${bars}</div>
+      <div class="mute" style="min-height:36px">${u.d(l)}</div>
+      ${nx ? `<div class="mute" style="margin:4px 0">Далі: ${u.d(l+1)}</div>
+        <button class="${G.level>=nx.need && G.money>=nx.cost ? 'ok' : ''}" style="width:100%" data-act="buy" data-k="${k}" ${G.level<nx.need||G.money<nx.cost?'disabled':''}>
+        ${G.level < nx.need ? `🔒 Потрібен рівень ${nx.need}` : `Купити · ${fmt(nx.cost)} ₴`}</button>` : '<div class="mute"><b>✅ Максимум</b></div>'}</div>`;
+  }).join('')}</div>`;
+}
+
+/* ---------- обслуговування гравцем ---------- */
+function openServe(id){
+  if (G.phase !== 'day') return;
+  if (FLOW){ FLOW.hidden = false; renderFlow(); return; }
+  const c = G.queue.find(c => c.id === id && !c.by); if (!c) return;
+  c.by = 'me';
+  FLOW = {cid:c.id, mist:0, step: c.kind === 'get' ? 'phone' : 'pack', i:0, picked:[], pack:null, wrap:false, weighed:false, pay:{}, extra:0};
+  if (c.kind === 'get') FLOW.rows = terminalRows(c);
+  sBell(); dirty = true; renderFlow();
+}
+function flowClient(){ return FLOW && G.queue.find(c => c.id === FLOW.cid); }
+function terminalRows(c){
+  const phones = [...new Set(G.parcels.filter(p => p.state === 'cell').map(p => p.phone))].filter(p => p !== c.phone);
+  return shuffle([c.phone, ...shuffle(phones).slice(0, 5)]);
+}
+function mistake(msg){ FLOW.mist++; sErr(); toast('❌ ' + msg, 'bad'); const c = flowClient(); if (c) c.pat -= 4; }
+function stepsBar(names, cur){ return `<div class="steps">${names.map((n,i) => `<i class="${i<=cur?'on':''}" title="${n}"></i>`).join('')}</div>`; }
+function speaker(c, text){ return `<div class="speaker"><span class="av">${c.av}</span><div class="bubble" style="flex:1">${text}</div></div>`; }
+function payHTML(c, total, label){
+  if (!FLOW.pay.given){
+    const cands = [50,100,200,500,1000].map(b => Math.ceil(total/b)*b).filter(b => b > total);
+    FLOW.pay.given = cands.length ? pick(cands.slice(0,3)) : total + 100;
+  }
+  if (FLOW.pay.stage === 'change'){
+    const right = FLOW.pay.given - total;
+    if (!FLOW.pay.opts) FLOW.pay.opts = shuffle([...new Set([right, right + pick([10,20,50]), Math.max(5, right - pick([10,20,50]))])].filter(x => x > 0));
+    return `${speaker(c, `Ось, тримайте <b>${FLOW.pay.given} ₴</b>.`)}<div class="terminal">💵 До сплати <b>${total} ₴</b> · отримано <b>${FLOW.pay.given} ₴</b><br>Скільки решти?</div>
+      <div class="opts">${FLOW.pay.opts.map(v => `<button data-act="change" data-v="${v}">${v} ₴</button>`).join('')}</div>`;
+  }
+  return `${speaker(c, c.card ? 'Можна карткою оплатити?' : 'Я готівкою, добре?')}
+    <div class="terminal">${label}<br>До сплати: <b style="font-size:20px">${total} ₴</b></div>
+    <div class="opts"><button data-act="pay" data-v="card">💳 Термінал</button><button data-act="pay" data-v="cash">💵 Готівка</button></div>`;
+}
+function renderFlow(){
+  const c = flowClient();
+  if (!c){ FLOW = null; closeModal(); return; }
+  if (FLOW.hidden) return;
+  const reg = c.reg ? REG(c.reg) : null;
+  let body = '';
+  if (c.kind === 'get'){
+    const ps = G.parcels.filter(p => c.pids.includes(p.id));
+    const cod = ps.reduce((a,p) => a + p.cod, 0);
+    const steps = ['Пошук','Комірка', ...(cod ? ['Оплата'] : []), 'Видача'];
+    const si = {phone:0, cells:1, pay:2, give: cod ? 3 : 2}[FLOW.step];
+    body += stepsBar(steps, si);
+    if (FLOW.step === 'phone'){
+      const rows = G.up.scanner >= 2 ? [c.phone] : FLOW.rows;
+      const pnum = c.reg === 'nina' && !FLOW.ninaOk ? null : c.phone;
+      body += speaker(c, `${esc(c.hi)}${pnum ? `<br>Номер: <b style="font-size:17px">${pnum}</b>` : ''}`);
+      if (!pnum) body += `<button data-act="nina">⏳ Зачекати, поки знайде номер</button>`;
+      else body += `<div class="terminal">📟 Пошук посилки за номером телефону${G.up.scanner>=2?' · 🔎 знайдено автоматично':''}:<div style="margin-top:6px">${rows.map(ph => {
+          const n = G.parcels.filter(p => p.state==='cell' && p.phone===ph).length;
+          return `<div class="trow" data-act="findrow" data-v="${ph}"><span>📞 ${ph}</span><span>${n} пос.</span></div>`; }).join('')}</div></div>`;
+    } else if (FLOW.step === 'cells'){
+      const need = ps.map(p => p.cell);
+      body += `<div class="terminal">📟 Знайдено ${ps.length} пос. · Принеси з комірок: ${ps.map(p => `<b>${FLOW.picked.includes(p.id) ? '✅' : ''}${p.cell}</b>`).join(', ')}</div>`;
+      body += rackHTML('fetch', need, ps.filter(p => FLOW.picked.includes(p.id)).map(p => p.cell));
+    } else if (FLOW.step === 'pay'){
+      body += payHTML(c, cod, `Накладений платіж за ${ps.length} пос.`);
+    } else if (FLOW.step === 'give'){
+      body += speaker(c, 'Дякую!');
+      body += `<div class="pile" style="margin-bottom:10px">${ps.map(p => parcelHTML(p, '')).join('')}</div>
+        <button class="ok" style="width:100%;padding:14px" data-act="give">📦 Видати посилку</button>`;
+    }
+  } else {
+    const it = c.items[FLOW.i];
+    const steps = [];
+    c.items.forEach((_,i) => steps.push('Пакування','Зважування','Місто'));
+    steps.push('Оплата','ТТН');
+    const base = FLOW.i*3;
+    const si = {pack:base, weigh:base+1, city:base+2, pay:c.items.length*3, print:c.items.length*3+1}[FLOW.step];
+    body += stepsBar(steps, si);
+    if (FLOW.step === 'pack' || FLOW.step === 'weigh' || FLOW.step === 'city'){
+      const say = FLOW.step === 'city' ? `Відправляємо в <b>${it.city}</b>, на відділення.` :
+        `${esc(FLOW.i ? 'І ще одну:' : c.hi)} <b>${it.item.toLowerCase()}</b>${it.f ? ' — обережно, там крихке!' : ''}${c.items.length>1?` (${FLOW.i+1}/${c.items.length})`:''}`;
+      body += speaker(c, say);
+      body += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${it.item}</b><div class="mute">Розмір: ${SIZE_CM[it.s]}</div>${it.f?'<div class="fr"><b>⚠ Крихке</b></div>':''}${it.packed?'<div class="mute">🏷️ Вже запаковано власником</div>':''}</div></div>`;
+    }
+    if (FLOW.step === 'pack'){
+      body += `<div class="mute" style="margin-bottom:6px">Обери пакування:</div><div class="opts">${PACK.map(p => `<button class="${FLOW.pack===p.k?'on':''}" data-act="packsel" data-v="${p.k}">${p.e} ${p.n}${p.price?`<br><small>${p.price} ₴</small>`:''}</button>`).join('')}</div>
+        <label class="row" style="margin:10px 0"><input type="checkbox" data-act="wrap" style="width:auto" ${FLOW.wrap?'checked':''}> 🫧 Пухирцева плівка (+15 ₴)</label>
+        <button class="pri" style="width:100%" data-act="pack" ${FLOW.pack===null?'disabled':''}>Запакувати</button>`;
+    } else if (FLOW.step === 'weigh'){
+      body += `<div class="scale"><div class="disp">${FLOW.weighed ? it.w.toFixed(1) + ' кг' : '0.0 кг'}</div><div style="margin-top:10px">
+        ${FLOW.weighed ? '<button class="pri" data-act="weighok">Далі ➜</button>' : '<button class="pri" data-act="weigh">⚖️ Поставити на ваги</button>'}</div></div>`;
+    } else if (FLOW.step === 'city'){
+      if (!FLOW.cityOpts) FLOW.cityOpts = shuffle([it.city, ...shuffle(CITIES.filter(x => x !== it.city)).slice(0,3)]);
+      body += `<div class="mute" style="margin-bottom:6px">Місто призначення:</div><div class="opts">${FLOW.cityOpts.map(x => `<button data-act="city" data-v="${x}">${x}</button>`).join('')}</div>`;
+    } else if (FLOW.step === 'pay'){
+      const tot = sendTotal(c);
+      body += payHTML(c, tot.sum, tot.label);
+    } else if (FLOW.step === 'print'){
+      body += speaker(c, 'Супер, дякую!');
+      body += c.items.map(it => `<div class="ttn" style="margin-bottom:6px"><div class="bar">▌▍▌▌▍▌▍▍▌▌▍▌▍▌▌▍▍▌</div>${it.ttn} · ${it.e} ${it.w} кг → ${it.city}</div>`).join('');
+      body += `<button class="ok" style="width:100%;padding:14px" data-act="print">🖨️ Надрукувати ТТН і прийняти</button>`;
+    }
+  }
+  const pr = clamp(c.pat/c.max, 0, 1);
+  showModal(`${c.av} ${esc(c.name)}${reg?' ⭐':''}`, `<div class="pat" style="margin:-4px 0 10px"><i data-pat="${c.id}" style="width:${pr*100}%"></i></div>${body}`, true);
+}
+function sendTotal(c){
+  let sum = 0; const parts = [];
+  for (const it of c.items){
+    const pr = sendPrice(it.w, it.f); sum += pr + (it.packPrice||0);
+    parts.push(`${it.e} доставка ${pr} ₴${it.packPrice?` + пакування ${it.packPrice} ₴`:''}`);
+  }
+  return {sum, label: parts.join('<br>')};
+}
+function flowAct(act, el){
+  const c = flowClient(); if (!c) return;
+  const v = el.dataset.v;
+  if (act === 'nina'){ FLOW.ninaOk = true; c.pat -= 6; return renderFlow(); }
+  if (act === 'findrow'){
+    if (v === c.phone){ sScan(); FLOW.step = 'cells'; } else mistake('Це не той номер телефону!');
+    return renderFlow();
+  }
+  if (act === 'fetchcell'){
+    const ps = G.parcels.filter(p => c.pids.includes(p.id) && !FLOW.picked.includes(p.id) && p.cell === el.dataset.id);
+    if (ps.length){ sScan(); FLOW.picked.push(ps[0].id); }
+    else mistake('У цій комірці немає посилки клієнта');
+    if (c.pids.every(id => FLOW.picked.includes(id))){
+      const cod = G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0);
+      FLOW.step = cod ? 'pay' : 'give';
+    }
+    return renderFlow();
+  }
+  if (act === 'pay'){
+    if ((v === 'card') !== c.card){ mistake(c.card ? 'Клієнт хотів оплатити карткою' : 'Клієнт дає готівку!'); return renderFlow(); }
+    sScan();
+    if (v === 'card') nextAfterPay(c); else { FLOW.pay.stage = 'change'; }
+    return renderFlow();
+  }
+  if (act === 'change'){
+    const total = c.kind === 'get' ? G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0) : sendTotal(c).sum;
+    if (+v === FLOW.pay.given - total){ sCash(); nextAfterPay(c); } else mistake('Неправильна решта!');
+    return renderFlow();
+  }
+  if (act === 'give') return finishGet(c);
+  if (act === 'packsel'){ FLOW.pack = +v; return renderFlow(); }
+  if (act === 'wrap'){ FLOW.wrap = el.checked; return; }
+  if (act === 'pack'){
+    const it = c.items[FLOW.i];
+    const k = FLOW.pack;
+    if (it.packed || it.s >= 4){ if (k !== 9){ mistake('Ця річ уже запакована власником — пакування не потрібне'); return renderFlow(); } }
+    else if (k === 9){ mistake('Річ не запакована — треба обрати пакування'); return renderFlow(); }
+    else if (k < it.s){ mistake('Не влазить! Треба більше пакування'); return renderFlow(); }
+    if (it.f && !FLOW.wrap && !(it.packed)){ mistake('Крихке без пухирцевої плівки розіб’ється!'); return renderFlow(); }
+    if (k !== 9 && k > it.s + 1){ FLOW.extra -= 0.5; toast('Завелика коробка, клієнт трохи незадоволений'); }
+    const pk = PACK.find(p => p.k === k);
+    it.packPrice = (pk ? pk.price : 0) + (FLOW.wrap ? 15 : 0);
+    sScan(); FLOW.step = 'weigh'; FLOW.weighed = false;
+    return renderFlow();
+  }
+  if (act === 'weigh'){ FLOW.weighed = true; beep(1200, 0.05); return renderFlow(); }
+  if (act === 'weighok'){ FLOW.step = 'city'; FLOW.cityOpts = null; return renderFlow(); }
+  if (act === 'city'){
+    const it = c.items[FLOW.i];
+    if (v !== it.city){ mistake(`Клієнт казав «${it.city}»!`); return renderFlow(); }
+    sScan(); it.ttn = ttn();
+    if (FLOW.i < c.items.length - 1){ FLOW.i++; FLOW.step = 'pack'; FLOW.pack = null; FLOW.wrap = false; }
+    else FLOW.step = 'pay';
+    return renderFlow();
+  }
+  if (act === 'print') return finishSend(c);
+}
+function nextAfterPay(c){ FLOW.step = c.kind === 'get' ? 'give' : 'print'; FLOW.pay = {}; }
+function flowSat(c){
+  let sat = 5 - FLOW.mist + FLOW.extra;
+  if (c.pat/c.max < 0.3) sat -= 1;
+  return sat;
+}
+function finishGet(c){
+  const ps = G.parcels.filter(p => c.pids.includes(p.id));
+  const money = ps.reduce((a,p) => a + 15 + Math.round(p.cod*0.02), 0);
+  G.parcels = G.parcels.filter(p => !c.pids.includes(p.id));
+  G.stats.issued += ps.length; G.today.issued += ps.length;
+  const sat = rate(flowSat(c), c);
+  const tip = tipFor(c, sat);
+  FLOW = null; closeModal(); removeClient(c);
+  addMoney(money + tip); G.today.tips += tip; addXp(10*ps.length);
+  sCash();
+  toast(`${'⭐'.repeat(Math.round(sat))} +${money} ₴${tip?` · чайові ${tip} ₴ 💝`:''}`, 'good');
+}
+function finishSend(c){
+  const tot = sendTotal(c);
+  for (const it of c.items){
+    const p = makeParcel({item:ITEM(it.item), state:'outgoing'}); p.w = it.w; p.city = it.city; p.ttn = it.ttn || p.ttn;
+  }
+  const n = c.items.length;
+  G.stats.sent += n; G.today.sent += n;
+  const sat = rate(flowSat(c), c);
+  const tip = tipFor(c, sat);
+  FLOW = null; closeModal(); removeClient(c);
+  addMoney(tot.sum + tip); G.today.tips += tip; addXp(12*n);
+  sCash();
+  toast(`${'⭐'.repeat(Math.round(sat))} +${tot.sum} ₴${tip?` · чайові ${tip} ₴ 💝`:''}`, 'good');
+}
+
+/* ---------- модалки ---------- */
+let modalIsFlow = false;
+function showModal(title, html, isFlow=false){
+  modalIsFlow = isFlow;
+  const m = $('#modal');
+  m.innerHTML = `<div class="mbox"><div class="mhead">${title}<button class="x" data-act="mclose">${isFlow?'⤵ Згорнути':'✕'}</button></div><div class="mbody">${html}</div></div>`;
+  m.classList.remove('hidden');
+}
+function closeModal(){ $('#modal').classList.add('hidden'); $('#modal').innerHTML = ''; modalIsFlow = false; }
+function showDaySummary(s){
+  const avg = s.served ? (s.satSum/s.served).toFixed(1) : '—';
+  showModal(`🌙 День ${s.day} завершено`, `<div class="kv">
+    <span>📥 Видано посилок</span><b>${s.issued}</b><span>📤 Прийнято відправлень</span><b>${s.sent}</b>
+    <span>🚚 Розвантажено</span><b>${s.unloaded}</b><span>😊 Середня оцінка</span><b>${avg}</b>
+    <span>😠 Пішли незадоволені</span><b>${s.angry}</b><span>💝 Чайові</span><b>${fmt(s.tips)} ₴</b>
+    <span>💰 Зароблено</span><b>${fmt(s.earned)} ₴</b><span>👥 Зарплати</span><b>−${fmt(s.salaries)} ₴</b>
+    ${s.expired?`<span>⌛ Повернуто (термін зберігання)</span><b>${s.expired}</b>`:''}
+    ${s.returned?`<span>🔙 Не розвантажено з машин</span><b>${s.returned}</b>`:''}
+    <span>⭐ Рейтинг відділення</span><b>${G.rating.toFixed(2)}</b></div>
+    ${s.trained.length ? `<p>📚 Навчання завершили: ${s.trained.map(x => esc(x.name) + ' → ' + stars(x.lvl)).join(', ')}</p>` : ''}
+    ${G.money < 0 ? '<p class="fr"><b>⚠ Гроші в мінусі! Заробіть більше або зменшіть персонал.</b></p>' : ''}
+    <p class="mute">Посилки зберігаються в комірках 5 днів, потім повертаються відправнику.</p>
+    <button class="pri" style="width:100%" data-act="mclose">Добре</button>`);
+}
+function showLevelUp(unl){
+  setTimeout(() => {
+    if (modalIsFlow) { toast(`🎉 Новий рівень ${G.level}!`, 'gold'); return; }
+    showModal(`🎉 Рівень ${G.level}!`, `<p>Ваше відділення росте!</p>${unl.length ? `<p><b>Відкрито:</b></p><ul>${unl.map(u => `<li>${u}</li>`).join('')}</ul>` : ''}<p class="mute">Більше рівень — більше клієнтів і посилок.</p><button class="pri" style="width:100%" data-act="mclose">Круто!</button>`);
+  }, 50);
+}
+function showGuide(){
+  G.seenGuide = true;
+  showModal('📖 Як грати', `<ol class="guide">
+    <li><b>🚚 Рампа.</b> О 08:00 і 13:00 приїжджають машини з посилками. Натискай на коробки, щоб розвантажити їх, поки машина не поїхала.</li>
+    <li><b>📦 Склад.</b> Бери посилку з розбору — термінал скаже, в яку комірку її покласти. Натисни на ту комірку.</li>
+    <li><b>🏢 Зал.</b> Клієнти стають у чергу. Натисни «Наступний!». Щоб <b>видати</b>: знайди номер телефону в терміналі, принеси посилку з комірки, прийми оплату (картка або готівка з рештою) і видай.</li>
+    <li>Щоб <b>прийняти відправлення</b>: обери правильне пакування (крихкому — плівка!), зваж, обери місто, прийми оплату і надрукуй ТТН.</li>
+    <li><b>🚛 О 18:00</b> вечірня машина забирає відправлення — завантаж їх на Рампі.</li>
+    <li>Не тримай клієнтів довго — смужка внизу картки показує їхнє терпіння. Від оцінок залежить ⭐ рейтинг відділення.</li>
+    <li>Вночі наймай <b>👥 персонал</b>, відправляй його на навчання і купуй <b>🔧 покращення</b>. З ростом рівня з’являться <b>⭐ постійні клієнти</b>.</li>
+    <li><b>🌐 Онлайн</b>: рейтинг відділень інших гравців і загальний чат. Гра зберігається автоматично (і в хмару теж).</li></ol>
+    <button class="pri" style="width:100%" data-act="mclose">Зрозуміло, до роботи!</button>`);
+}
+function showSettings(){
+  const code = G.pid ? 'NP-' + btoa(JSON.stringify({i:G.pid, s:G.secret})) : '';
+  showModal('⚙️ Налаштування', `
+    <div class="card"><h3>🏤 Відділення</h3><div class="row"><input id="brname" value="${esc(G.branch)}" maxlength="40"><button data-act="rename">Зберегти</button></div>
+      <div class="mute" style="margin-top:6px">Нікнейм: <b>${esc(G.nick)}</b></div></div>
+    <div class="card"><h3>🔊 Звук</h3><button data-act="sound">${G.settings.sound ? '🔊 Увімкнено' : '🔇 Вимкнено'}</button></div>
+    <div class="card"><h3>☁️ Збереження</h3>
+      ${G.pid ? `<div class="mute">Код збереження — щоб грати цим відділенням на іншому пристрої. Нікому його не показуй!</div><div class="code" style="margin:6px 0">${code}</div><button class="sm" data-act="copycode">📋 Скопіювати</button>`
+        : `<div class="mute">Відділення ще не підключене до онлайну.</div><button class="sm" data-act="register">Підключити онлайн</button>`}
+      <div style="margin-top:10px" class="mute">Відновити відділення з коду:</div>
+      <div class="row"><input id="rcode" placeholder="NP-..."><button data-act="restore">Відновити</button></div>
+      <div class="mute" style="margin-top:6px">Остання хмарна копія: ${NET.lastCloud ? new Date(NET.lastCloud).toLocaleTimeString('uk-UA') : '—'}</div></div>
+    <div class="mute">Версія гри: ${GAME_BUILD}</div>`);
+}
+
+/* ---------- дії ---------- */
+function act(a, el){
+  const id = +el.dataset.id;
+  if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina'].includes(a)) return flowAct(a, el);
+  switch(a){
+    case 'serve': return openServe(id || (G.queue.find(c => !c.by)||{}).id);
+    case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
+    case 'mclose': if (modalIsFlow && FLOW){ FLOW.hidden = true; closeModal(); dirty = true; } else closeModal(); return;
+    case 'startday': return startDay();
+    case 'pause': paused = !paused; dirty = true; return;
+    case 'speed': G.settings.speed = G.settings.speed === 1 ? 2 : G.settings.speed === 2 ? 3 : 1; dirty = true; return;
+    case 'savenow': save(); cloudSave(true).then(ok => toast(ok ? '💾 Збережено (і в хмару)' : '💾 Збережено на пристрої', 'good')); return;
+    case 'guide': return showGuide();
+    case 'settings': return showSettings();
+    case 'take': {
+      const p = G.parcels.find(p => p.id === id); if (!p) return;
+      if (G.hand === id){ G.hand = null; dirty = true; return; }
+      G.hand = id; p.target = targetCell(p); sScan();
+      if (!p.target) toast('Немає вільних комірок такого розміру — купи стелажі або видавай посилки!', 'bad');
+      dirty = true; return;
+    }
+    case 'cell': {
+      const cid = el.dataset.id;
+      const hand = G.parcels.find(p => p.id === G.hand);
+      if (!hand){
+        const ps = G.parcels.filter(p => p.state === 'cell' && p.cell === cid);
+        toast(ps.length ? `${cid}: ` + ps.map(p => `${p.e} …${String(p.ttn).slice(-4)}`).join(' ') : `${cid}: порожньо`);
+        return;
+      }
+      if (hand.target === cid){ sScan(); placeParcel(hand, cid); }
+      else { sErr(); toast(`Не та комірка! Потрібна ${hand.target}`, 'bad'); }
+      return;
+    }
+    case 'unload': {
+      const p = G.parcels.find(p => p.id === id); if (!p || p.state !== 'truck') return;
+      const need = G.up.cart ? 1 : p.s>=4?3:p.s===3?2:1;
+      p.unl++; beep(400 + p.unl*120, 0.05, 'triangle');
+      if (p.unl >= need){ p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; addXp(1); }
+      dirty = true; return;
+    }
+    case 'unloadall': {
+      const ps = G.parcels.filter(p => p.state === 'truck');
+      ps.forEach(p => { p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; });
+      G.time += ps.length; toast(`Розвантажено ${ps.length} посилок, пройшло ${ps.length} хв`); dirty = true; return;
+    }
+    case 'load': { const p = G.parcels.find(p => p.id === id); if (p && p.state === 'outgoing'){ p.state = 'loaded'; beep(500,0.05,'triangle'); addXp(1); } dirty = true; return; }
+    case 'role': { const s = G.staff.find(s => s.id === id); if (s){ s.role = el.dataset.role; if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; s.cl = null; } } dirty = true; return; }
+    case 'train': {
+      const s = G.staff.find(s => s.id === id); if (!s) return;
+      const cost = trainCost(s);
+      if (G.money < cost) return toast('Не вистачає грошей', 'bad');
+      G.money -= cost; s.training = G.day;
+      if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; s.cl = null; }
+      toast(`📚 ${esc(s.name)} пішов(ла) на навчання до кінця дня ${G.day}`); dirty = true; return;
+    }
+    case 'fire': {
+      const s = G.staff.find(s => s.id === id); if (!s) return;
+      if (!confirm(`Звільнити ${s.name}?`)) return;
+      if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; }
+      G.staff = G.staff.filter(x => x.id !== id); dirty = true; return;
+    }
+    case 'hire': {
+      if (G.staff.length >= staffMax()) return;
+      const s = G.cand.find(s => s.id === id); if (!s) return;
+      G.cand = G.cand.filter(x => x.id !== id); G.staff.push(s);
+      toast(`👋 ${esc(s.name)} тепер працює у вас!`, 'good'); dirty = true; return;
+    }
+    case 'buy': {
+      const k = el.dataset.k, nx = upNext(k); if (!nx || G.level < nx.need || G.money < nx.cost) return;
+      G.money -= nx.cost; G.up[k]++; sCash();
+      toast(`${UPS[k].e} ${UPS[k].n}: рівень ${G.up[k]}!`, 'good'); save(); dirty = true; return;
+    }
+    case 'rename': { const v = $('#brname').value.trim(); if (v){ G.branch = v.slice(0,40); save(); cloudSave(true); toast('Збережено', 'good'); dirty = true; } return; }
+    case 'sound': G.settings.sound = !G.settings.sound; showSettings(); return;
+    case 'copycode': { const t = $('.code').textContent; navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Скопійовано', 'good'), () => {}); return; }
+    case 'restore': return restoreFromCode($('#rcode').value.trim());
+    case 'register': return registerOnline();
+    case 'onltab': NET.sub = el.dataset.v; dirty = true; return;
+    case 'lbsort': NET.sort = el.dataset.v; NET.top = null; loadTop(); dirty = true; return;
+    case 'chatsend': return chatSend();
+    case 'player': return showPlayer(el.dataset.id);
+    case 'onboard': return onboard();
+    case 'regnick': { const n = ($('#regnick').value || '').trim().slice(0,24); if (n.length < 2) return toast('Мінімум 2 символи', 'bad'); closeModal(); return registerOnline(n); }
+  }
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (t){ TAB = t.dataset.tab; if (TAB === 'online'){ NET.unread = 0; loadTop(); chatPoll(); } dirty = true; window.scrollTo(0,0); return; }
+  const a = e.target.closest('[data-act]');
+  if (a && a.dataset.act) act(a.dataset.act, a);
+});
+document.addEventListener('change', e => { const a = e.target.closest('[data-act="wrap"]'); if (a) flowAct('wrap', a); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'chatin') chatSend(); });
+
+/* ---------- збереження ---------- */
+function save(){
+  if (!G) return;
+  G.savedAt = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch(e){}
+}
+function loadLocal(){
+  try { const s = localStorage.getItem(SAVE_KEY); return s ? migrate(JSON.parse(s)) : null; } catch(e){ return null; }
+}
+
+/* ---------- онлайн ---------- */
+const NET = {ok: !!(CFG.supabaseUrl && CFG.supabaseKey), unread:0, sub:'top', sort:'level', top:null, chat:[], lastId:0, lastCloud:0, ch:null, saving:false};
+async function rpc(fn, args){
+  if (!NET.ok) throw new Error('offline');
+  const r = await fetch(`${CFG.supabaseUrl}/rest/v1/rpc/${fn}`, {method:'POST', headers:{'Content-Type':'application/json', apikey:CFG.supabaseKey}, body:JSON.stringify(args||{})});
+  const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch(e){}
+  if (!r.ok) throw new Error((j && (j.message || j.hint)) || t || ('HTTP ' + r.status));
+  return j;
+}
+function randSecret(){ const a = new Uint8Array(24); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2,'0')).join(''); }
+function statsPayload(){ return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1}; }
+async function cloudSave(force){
+  if (!G || !G.pid || NET.saving) return false;
+  if (!force && Date.now() - NET.lastCloud < 55000) return false;
+  NET.saving = true;
+  try {
+    save();
+    const st = JSON.parse(JSON.stringify(G)); delete st.secret;
+    await rpc('np_save', {p_id:G.pid, p_secret:G.secret, p_state:JSON.stringify(st), p_build:GAME_BUILD, p_stats:statsPayload()});
+    NET.lastCloud = Date.now(); return true;
+  } catch(e){
+    if (/outdated game build/.test(e.message)){ save(); location.reload(); }
+    return false;
+  } finally { NET.saving = false; }
+}
+async function registerOnline(nickOverride){
+  if (!G) return;
+  const secret = randSecret();
+  try {
+    const id = await rpc('np_register', {p_nick: nickOverride || G.nick, p_branch: G.branch, p_secret: secret});
+    G.pid = id; G.secret = secret; if (nickOverride) G.nick = nickOverride;
+    save(); await cloudSave(true); connectChat();
+    toast('🌐 Онлайн підключено!', 'good');
+    if ($('#modal .code') || $('#rcode')) showSettings();
+    return true;
+  } catch(e){
+    if (/nick taken/.test(e.message)){
+      showModal('🌐 Нікнейм зайнятий', `<p>Нікнейм <b>${esc(nickOverride || G.nick)}</b> вже використовує інший гравець. Придумай інший:</p>
+        <input id="regnick" maxlength="24" value="${esc((nickOverride || G.nick) + ri(1,99))}">
+        <button class="pri" style="width:100%;margin-top:10px" data-act="regnick">Підключити онлайн</button>
+        <div class="mute" style="margin-top:8px">Можна закрити це вікно і підключитись пізніше в ⚙️ налаштуваннях.</div>`);
+    } else toast('Не вдалося підключити онлайн. Гра працює офлайн, спробуємо пізніше.', 'bad');
+    return false;
+  }
+}
+async function cloudSync(){
+  if (!G || !G.pid) return;
+  try {
+    const r = await rpc('np_load', {p_id:G.pid, p_secret:G.secret});
+    NET.admin = !!(r && r.admin);
+    if (r && r.build && r.build > GAME_BUILD){ save(); location.reload(); return; }
+    if (r && r.state && r.saved_at > (G.savedAt || 0) + 2000){
+      const st = migrate(JSON.parse(r.state));
+      st.pid = G.pid; st.secret = G.secret;
+      G = st; FLOW = null; closeModal(); save();
+      toast('☁️ Завантажено новіший прогрес з хмари', 'good');
+    }
+    NET.lastCloud = Date.now();
+    dirty = true;
+  } catch(e){ /* офлайн — граємо далі */ }
+}
+async function restoreFromCode(code){
+  try {
+    const o = JSON.parse(atob(code.replace(/^NP-/, '').trim()));
+    const r = await rpc('np_load', {p_id:o.i, p_secret:o.s});
+    if (!r) throw new Error('empty');
+    if (!confirm('Замінити поточне відділення на відновлене?')) return;
+    let st = r.state ? migrate(JSON.parse(r.state)) : newGame(r.nick, 'Відділення №1');
+    st.pid = o.i; st.secret = o.s; st.nick = r.nick;
+    G = st; FLOW = null; save(); closeModal(); connectChat();
+    toast('✅ Відділення відновлено!', 'good'); dirty = true;
+  } catch(e){ toast('Код не підходить', 'bad'); }
+}
+async function loadTop(){
+  try { NET.top = await rpc('np_top', {p_sort: NET.sort}); if (TAB === 'online') dirty = true; } catch(e){ NET.top = NET.top || []; }
+}
+function connectChat(){
+  if (NET.ch || !window.supabase || !NET.ok) return;
+  try {
+    const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {auth:{persistSession:false, autoRefreshToken:false}});
+    NET.ch = sb.channel('np-chat', {config:{broadcast:{self:false}}});
+    NET.ch.on('broadcast', {event:'m'}, ({payload}) => addChat([payload]));
+    NET.ch.subscribe();
+  } catch(e){}
+}
+function addChat(list){
+  let added = 0;
+  for (const m of list){
+    if (!m || NET.chat.some(x => x.id === m.id)) continue;
+    NET.chat.push(m); added++;
+    if (m.id > NET.lastId) NET.lastId = m.id;
+    if (TAB !== 'online' && NET.loadedOnce && m.from_id !== G.pid) NET.unread++;
+  }
+  NET.chat.sort((a,b) => a.id - b.id);
+  if (NET.chat.length > 120) NET.chat = NET.chat.slice(-120);
+  if (added){
+    if (TAB === 'online' && NET.sub === 'chat') drawChat();
+    else renderTabs();
+  }
+}
+async function chatPoll(){
+  try { const r = await rpc('np_chat_recent', {p_after: NET.lastId}); addChat(r || []); NET.loadedOnce = true; } catch(e){}
+}
+async function chatSend(){
+  const inp = $('#chatin'); if (!inp) return;
+  const body = inp.value.trim(); if (!body) return;
+  if (!G.pid){ toast('Спершу підключи онлайн у налаштуваннях', 'bad'); return; }
+  inp.value = '';
+  try {
+    const id = await rpc('np_chat_send', {p_id:G.pid, p_secret:G.secret, p_body:body});
+    const m = {id, at:new Date().toISOString(), from_id:G.pid, nick:G.nick, body:body.slice(0,300)};
+    addChat([m]);
+    if (NET.ch) NET.ch.send({type:'broadcast', event:'m', payload:m});
+  } catch(e){ toast(/too fast/.test(e.message) ? 'Не так швидко 🙂' : 'Не вдалося надіслати', 'bad'); inp.value = body; }
+}
+function drawChat(){
+  const box = $('#chatbox'); if (!box) return;
+  box.innerHTML = NET.chat.map(m => `<div class="msg"><b data-nol10n>${esc(m.nick)}</b><span class="t">${new Date(m.at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'})}</span><br>${esc(m.body)}</div>`).join('') || '<div class="mute">Поки тихо. Привітайся першим! 👋</div>';
+  box.scrollTop = box.scrollHeight;
+}
+function viewOnline(){
+  const me = `<div class="card"><h3>👤 ${esc(G.nick)}</h3><div class="mute">${G.pid ? '<span class="dot on"></span>Ви онлайн · прогрес зберігається в хмару' : 'Відділення не підключене до онлайну'}</div>
+    ${G.pid ? '' : '<button class="pri sm" style="margin-top:6px" data-act="register">🌐 Підключити онлайн</button>'}</div>`;
+  const sub = `<div class="subtabs"><button class="${NET.sub==='top'?'on':''}" data-act="onltab" data-v="top">🏆 Рейтинг відділень</button><button class="${NET.sub==='chat'?'on':''}" data-act="onltab" data-v="chat">💬 Чат</button></div>`;
+  if (NET.sub === 'chat'){
+    return me + sub + `<div class="card"><div class="chat" id="chatbox"></div><div class="row" style="flex-wrap:nowrap"><input id="chatin" maxlength="300" placeholder="Повідомлення…"><button class="pri" data-act="chatsend">➤</button></div></div>`;
+  }
+  const sorts = [['level','Рівень'],['parcels','Посилки'],['rating','Рейтинг'],['money','Гроші']];
+  const top = NET.top;
+  const online = top ? top.filter(p => p.online).length : 0;
+  return me + sub + `<div class="card"><div class="row" style="margin-bottom:8px">${sorts.map(([k,n]) => `<button class="sm ${NET.sort===k?'pri':''}" data-act="lbsort" data-v="${k}">${n}</button>`).join('')}<span class="sp"></span><span class="mute"><span class="dot on"></span>онлайн: ${online}</span></div>
+    ${!top ? '<div class="mute">Завантаження…</div>' : !top.length ? '<div class="mute">Поки нікого. Будь першим!</div>' :
+    `<table class="lb"><tr><th>#</th><th>Відділення</th><th>Рів.</th><th>⭐</th><th>📦</th></tr>${top.map((p,i) => `<tr class="${p.id===G.pid?'mine':''}" data-act="player" data-id="${p.id}" style="cursor:pointer">
+      <td>${i+1}</td><td><span class="dot ${p.online?'on':''}"></span><b data-nol10n>${esc(p.nickname)}</b><div class="mute" data-nol10n>${esc(p.branch)}</div></td><td>${p.level}</td><td>${(+p.rating).toFixed(2)}</td><td>${fmt(p.parcels)}</td></tr>`).join('')}</table>`}</div>`;
+}
+function afterOnline(){ if (NET.sub === 'chat') drawChat(); }
+function showPlayer(id){
+  const p = (NET.top||[]).find(x => x.id === id); if (!p) return;
+  const seen = p.online ? '<span class="dot on"></span>зараз онлайн' : `був(ла) ${new Date(p.last_seen).toLocaleString('uk-UA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`;
+  showModal(`🏤 ${esc(p.nickname)}`, `<div class="card"><h3 data-nol10n>${esc(p.branch)}</h3><div class="mute">${seen}</div></div>
+    <div class="card kv"><span>Рівень</span><b>${p.level}</b><span>⭐ Рейтинг</span><b>${(+p.rating).toFixed(2)}</b>
+    <span>📦 Посилок оброблено</span><b>${fmt(p.parcels)}</b><span>💰 Каса</span><b>${fmt(p.money)} ₴</b>
+    <span>👥 Персонал</span><b>${p.staff}</b><span>📅 Відпрацьовано днів</span><b>${p.days}</b></div>
+    <button class="pri" style="width:100%" data-act="mclose">Закрити</button>`);
+}
+
+/* ---------- оновлення гри ---------- */
+async function checkVersion(){
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) return;
+    const v = await r.json();
+    if (v.build > GAME_BUILD){
+      const b = $('#updbar'); b.classList.remove('hidden');
+      b.innerHTML = `🆕 Вийшло оновлення гри! <button class="pri sm" onclick="save();location.reload()">Оновити</button>`;
+    }
+  } catch(e){}
+}
+
+/* ---------- старт ---------- */
+function onboard(){
+  const nick = ($('#obnick').value || '').trim().slice(0,24);
+  const br = ($('#obbranch').value || '').trim().slice(0,40) || 'Відділення №1';
+  if (nick.length < 2){ toast('Введи нікнейм (мінімум 2 символи)', 'bad'); return; }
+  G = newGame(nick, br); save(); closeModal();
+  dirty = true;
+  registerOnline();
+  showGuide();
+}
+function showOnboard(){
+  showModal('📦 Ласкаво просимо в «Наша Пошта»!', `
+    <p>Ти — новий оператор маленького пункту видачі. Розвантажуй машини, розкладай посилки по комірках, обслуговуй клієнтів і розвивай своє відділення до справжнього хабу!</p>
+    <div class="card"><div class="mute">Твій нікнейм (буде видно в рейтингу і чаті)</div><input id="obnick" maxlength="24" placeholder="Наприклад, Оператор Дмитро">
+      <div class="mute" style="margin-top:8px">Назва відділення</div><input id="obbranch" maxlength="40" value="Відділення №1, вул. Центральна"></div>
+    <button class="pri" style="width:100%;padding:14px" data-act="onboard">🚀 Почати роботу</button>
+    <div class="mute" style="margin-top:10px">Вже грав на іншому пристрої? Відкрий ⚙️ після старту і введи код збереження.</div>`);
+  $('#modal .x').classList.add('hidden');
+}
+function boot(){
+  G = loadLocal();
+  if (!G){ showOnboard(); G = null; }
+  else { cloudSync(); connectChat(); }
+  setInterval(tick, 100);
+  setInterval(() => { if (G){ save(); } }, 15000);
+  setInterval(() => { if (G && G.pid){ cloudSave(); } }, 60000);
+  setInterval(() => { if (G && G.pid && TAB === 'online'){ loadTop(); if (NET.sub === 'chat') chatPoll(); } }, 15000);
+  setInterval(() => { if (G && G.pid && TAB !== 'online') chatPoll(); }, 45000);
+  setInterval(checkVersion, 300000); checkVersion();
+  setInterval(() => { if (G && !G.pid && !NET.regTried){ NET.regTried = true; registerOnline(); } }, 120000);
+  setTimeout(chatPoll, 1500);
+  window.addEventListener('beforeunload', save);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && G){ save(); cloudSave(true); } });
+}
+boot();
+</script>
+</body>
+</html>
