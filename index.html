@@ -165,6 +165,12 @@ main{padding:4px 10px}
 .hearts{color:var(--red);font-size:12px}
 .code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)}
 .guide li{margin-bottom:6px}
+.decor{display:flex;gap:6px;font-size:24px;justify-content:flex-end;margin:-4px 0 -6px;flex-wrap:wrap}
+.traits{display:flex;gap:4px;flex-wrap:wrap;margin:3px 0}.traits span{background:var(--blue2);color:var(--blue);border-radius:8px;padding:1px 6px;font-size:12px;font-weight:600}
+.mbars{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 6px;align-items:center;font-size:12px;color:var(--mute);max-width:420px}.mbars .lvl{margin:0}
+.task{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:#fff}.task.done{background:var(--green2)}.task .lvl{margin:4px 0 0}
+.achs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.ach{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;opacity:.6}.ach.got{opacity:1;background:var(--amber2)}.ach .ae{font-size:30px}
+.badge2{background:var(--amber2);border:1px solid var(--amber);border-radius:10px;padding:3px 8px;font-size:13px}
 .banner{background:#fff;border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:14px}
 .banner.ev{border-left-color:var(--amber);background:var(--amber2)}.banner.insp{border-left-color:var(--red);background:var(--red3)}.banner.dark{border-left-color:#000;background:#2b2b2b;color:#eee}
 #dark{position:fixed;inset:0;pointer-events:none;z-index:55;background:radial-gradient(circle 190px at var(--fx,50%) var(--fy,45%),transparent 0,transparent 55%,rgba(5,5,15,.8) 100%)}
@@ -203,7 +209,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610311959; // ставиться build.py
+const GAME_BUILD = 202610312002; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -318,6 +324,65 @@ const PACK = [
   {k:9, n:'Своє пакування', e:'🏷️', price:0},
 ];
 
+/* ---------- розвиток: завдання, досягнення, кар'єра, оформлення, риси ---------- */
+const TASK_T = [
+  {k:'streak', t:'Видай {n} посилок поспіль без помилок', n:[8,12,18], r:[300,450,650]},
+  {k:'send', t:'Прийми {n} відправлень', n:[5,8,12], r:[250,400,600]},
+  {k:'unload', t:'Розвантаж {n} посилок з машин', n:[15,25,35], r:[200,300,450]},
+  {k:'regs', t:'Обслужи {n} постійних клієнтів', n:[2,3,4], r:[250,350,500]},
+  {k:'earn', t:'Заробіть за день {n} ₴', n:[1500,2500,4000], r:[300,450,700]},
+  {k:'noangry', t:'Ніхто не піде злим до кінця дня', n:[1], r:[500]},
+  {k:'fraud', t:'Не віддай посилку шахраю з «довіреністю»', n:[1], r:[400]},
+  {k:'refuse', t:'Оформи відмову після огляду посилки', n:[1], r:[300]},
+  {k:'redir', t:'Оформи переадресацію або повернення', n:[1,2], r:[250,450]},
+  {k:'lost', t:'Знайди загублену посилку на складі', n:[1], r:[300]},
+  {k:'cash', t:'Дай правильну решту {n} разів', n:[3,5], r:[200,350]},
+  {k:'tips', t:'Отримай чайові {n} разів', n:[2,3], r:[250,400]},
+  {k:'insp', t:'Отримай премію від регіонального менеджера', n:[1], r:[500]},
+];
+const ACH = [
+  {k:'issued', n:'Видавець', e:'📥', t:[50,250,1000,5000], g:()=>G.stats.issued, d:'Видано посилок'},
+  {k:'sent', n:'Приймальник', e:'📤', t:[25,150,600,2000], g:()=>G.stats.sent, d:'Прийнято відправлень'},
+  {k:'unloaded', n:'Вантажник', e:'🚚', t:[100,500,2000], g:()=>G.stats.unloaded, d:'Розвантажено посилок'},
+  {k:'fraud', n:'Пильне око', e:'🕵️', t:[1,10,30], g:()=>G.stats.fraud||0, d:'Викрито шахраїв'},
+  {k:'insp', n:'Взірцеве відділення', e:'👔', t:[1,5,15], g:()=>G.stats.inspGood||0, d:'Перевірок з премією'},
+  {k:'days', n:'Ветеран', e:'📅', t:[7,30,100], g:()=>G.day-1, d:'Відпрацьовано днів'},
+  {k:'level', n:'Зростання', e:'📈', t:[5,10,15,20], g:()=>G.level, d:'Рівень відділення'},
+  {k:'hearts', n:'Улюбленець району', e:'❤️', t:[1,4,8], g:()=>Object.values(G.regs).filter(r=>r.hearts>=5).length, d:'Постійних клієнтів з 5 ❤'},
+  {k:'earned', n:'Мільйонер', e:'💰', t:[10000,100000,1000000], g:()=>G.stats.earned, d:'Зароблено всього, ₴'},
+  {k:'tasks', n:'Відповідальний', e:'🎯', t:[10,50,200], g:()=>G.stats.tasks||0, d:'Виконано щоденних завдань'},
+  {k:'gifts', n:'Щедра душа', e:'🎁', t:[1,10,50], g:()=>G.stats.giftsSent||0, d:'Надіслано подарунків друзям'},
+];
+const RANKS = [
+  {n:'Оператор', e:'🧑‍💼', bonus:0},
+  {n:'Старший оператор', e:'👨‍💼', bonus:100, need:{level:5, parcels:300}},
+  {n:'Начальник відділення', e:'🎖️', bonus:300, need:{level:10, parcels:1500, rating:4.2}},
+  {n:'Регіональний керівник', e:'👑', bonus:800, need:{level:15, parcels:5000, branches:2}},
+];
+const BRANCH_COST = [25000, 60000];
+const WALLS = {cream:['Кремові','#f1eee9',0], mint:['М’ятні','#dff2e6',300], sky:['Небесні','#e1ecfb',300], peach:['Персикові','#fbe6d6',300], lilac:['Лавандові','#ece2f7',400], brand:['Фірмові червоні','#fbdcdc',600]};
+const DECOR = {
+  plant:{n:'Вазон', e:'🪴', c:400, pat:0.05}, ficus:{n:'Фікус', e:'🌿', c:700, pat:0.05}, poster:{n:'Плакат «Обережно, крихке!»', e:'🖼️', c:250, sat:0.05},
+  tariff:{n:'Стенд з тарифами', e:'📜', c:300, sat:0.05}, clock:{n:'Настінний годинник', e:'🕰️', c:300, sat:0.05}, flag:{n:'Прапор України', e:'🇺🇦', c:200, sat:0.05},
+  cooler:{n:'Кулер з водою', e:'🚰', c:1200, pat:0.1}, candy:{n:'Цукерки на стійці', e:'🍬', c:600, tip:0.05}, tv:{n:'Телевізор у залі', e:'📺', c:2500, pat:0.1},
+  aquarium:{n:'Акваріум', e:'🐠', c:4000, pat:0.08, sat:0.1}, cat:{n:'Кіт відділення', e:'🐈', c:3000, sat:0.15},
+};
+const TRAITS = {
+  fast:{n:'⚡ Швидкі руки', d:'працює на 25% швидше'}, polite:{n:'😊 Ввічливий', d:'клієнти ставлять вищі оцінки'},
+  calm:{n:'🧘 Не боїться черги', d:'майже не втомлюється від натовпу'}, careful:{n:'🎯 Уважний', d:'помиляється вдвічі рідше'},
+  cheerful:{n:'🎵 Життєрадісний', d:'настрій падає повільніше'}, lazy:{n:'🐢 Лінивий', d:'повільніший на 20%, зате просить меншу зарплату'},
+};
+const hasT = (s, t) => (s.traits || []).includes(t);
+function staffMul(s){
+  let m = 1 + (s.fat||0)/150;
+  if ((s.mood ?? 80) < 30) m *= 1.2;
+  if (hasT(s,'fast')) m *= 0.75; if (hasT(s,'lazy')) m *= 1.2;
+  return m;
+}
+function decorPat(){ let m = 0; for (const k in (G.decor||{}).items||{}) m += DECOR[k] ? DECOR[k].pat||0 : 0; return m; }
+function decorSat(){ let m = 0; for (const k in (G.decor||{}).items||{}) m += DECOR[k] ? DECOR[k].sat||0 : 0; return m; }
+function decorTip(){ let m = 0; for (const k in (G.decor||{}).items||{}) m += DECOR[k] ? DECOR[k].tip||0 : 0; return m; }
+
 /* ---------- стан ---------- */
 let G = null;          // збереження
 let FLOW = null;       // поточне обслуговування гравцем (не зберігається)
@@ -336,6 +401,7 @@ function newGame(nick, branch){
     parcels:[], nid:1, queue:[], cid:1, truck:null, trucksDone:{}, hand:null,
     up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0},
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
+    tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
     staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
 }
 function migrate(g){
@@ -357,12 +423,12 @@ const bigCount = (l=G.up.shelves) => 2 + l*2;
 const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0);
 const staffMax = (l=G.up.tier) => 2 + l*2;
 const needXp = l => Math.round(120*Math.pow(l,1.5));
-const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1);
-const satBonus = () => G.up.ac ? 0.3 : 0;
-const tipMul = () => G.up.coffee ? 1.25 : 1;
-const serveT = s => 16 - s.lvl*2;            // сек на клієнта
-const storeIv = s => (4 - s.lvl*0.5) * (G.up.cart ? 0.7 : 1);
-const errCh = s => 0.12 - s.lvl*0.02;
+const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1) * (1 + decorPat());
+const satBonus = () => (G.up.ac ? 0.3 : 0) + decorSat();
+const tipMul = () => (G.up.coffee ? 1.25 : 1) + decorTip();
+const serveT = s => (16 - s.lvl*2) * staffMul(s);            // сек на клієнта
+const storeIv = s => (4 - s.lvl*0.5) * (G.up.cart ? 0.7 : 1) * staffMul(s);
+const errCh = s => (0.12 - s.lvl*0.02) * (hasT(s,'careful') ? 0.5 : 1) * (1 + (s.fat||0)/100) * ((s.mood ?? 80) < 30 ? 1.4 : 1);
 const trainCost = s => 400*s.lvl;
 const sendPrice = (w, f) => 60 + Math.round(15*w) + (f ? 20 : 0);
 const smallCell = s => s <= 2;
@@ -391,7 +457,43 @@ function targetCell(p){
   return opts.length ? pick(opts) : null;
 }
 
-function countTask(k, n){ /* щоденні завдання — див. нижче */ }
+/* ---------- щоденні завдання і досягнення ---------- */
+function genTasks(){
+  const pool = shuffle(TASK_T.filter(t => (t.k !== 'regs' || G.level >= 2) && (t.k !== 'insp' || G.level >= 3) && (!['fraud','refuse','lost','insp'].includes(t.k) || Math.random() < 0.5))).slice(0, 3);
+  G.tasks = pool.map(t => { const i = ri(0, t.n.length - 1); return {k:t.k, n:t.n[i], r:t.r[i], prog:0, done:false}; });
+}
+function taskText(t){ return TASK_T.find(x => x.k === t.k).t.replace('{n}', fmt(t.n)); }
+function countTask(k, n, set){
+  if (!G || !G.tasks) return;
+  for (const t of G.tasks){
+    if (t.k !== k || t.done) continue;
+    t.prog = set ? Math.max(t.prog, n) : t.prog + n;
+    if (t.prog >= t.n){
+      t.done = true; G.stats.tasks = (G.stats.tasks||0) + 1;
+      G.money += t.r; G.stats.earned += t.r; addXp(Math.round(t.r/10));
+      sCash(); toast(`🎯 Завдання виконано: «${taskText(t)}» · +${fmt(t.r)} ₴`, 'gold');
+    }
+  }
+  dirty = true;
+}
+function checkAch(){
+  if (!G) return;
+  for (const a of ACH){
+    const v = a.g(), got = G.ach[a.k] || 0;
+    let tier = got; while (tier < a.t.length && v >= a.t[tier]) tier++;
+    if (tier > got){
+      G.ach[a.k] = tier;
+      const rew = 300 * tier * tier;
+      G.money += rew; G.stats.earned += rew;
+      sCash(); toast(`🏆 Досягнення «${a.e} ${a.n}» ${'★'.repeat(tier)} · +${fmt(rew)} ₴`, 'gold');
+    }
+  }
+}
+function rankReady(){
+  const nx = RANKS[G.rank + 1]; if (!nx) return false;
+  const n = nx.need, par = G.stats.issued + G.stats.sent;
+  return G.level >= n.level && par >= n.parcels && (!n.rating || G.rating >= n.rating) && (!n.branches || 1 + G.others.length >= n.branches);
+}
 
 /* ---------- звук ---------- */
 let AC = null;
@@ -628,7 +730,7 @@ function clientLeftAngry(c){
 }
 
 /* ---------- гроші та досвід ---------- */
-function addMoney(n){ G.money += n; if (n > 0){ G.stats.earned += n; G.today.earned += n; } dirty = true; }
+function addMoney(n){ G.money += n; if (n > 0){ G.stats.earned += n; G.today.earned += n; countTask('earn', G.today.earned, true); } dirty = true; }
 function addXp(n){
   G.xp += n;
   while (G.xp >= needXp(G.level)){
@@ -646,13 +748,19 @@ function addXp(n){
 function genCand(){
   const p = person();
   const lvl = Math.random() < 0.6 ? 1 : Math.random() < 0.75 ? 2 : 3;
-  return {id:G.sid++, name:p.name, av:p.av, lvl, salary: 250 + lvl*120 + ri(0,6)*10, role:'store', t:0, cl:null, training:0, done:0};
+  const traits = shuffle(Object.keys(TRAITS)).slice(0, Math.random() < 0.3 ? 0 : Math.random() < 0.65 ? 1 : 2);
+  if (traits.includes('lazy') && traits.includes('fast')) traits.splice(traits.indexOf('fast'), 1);
+  let salary = 250 + lvl*120 + ri(0,6)*10 + traits.filter(t => t !== 'lazy').length*30;
+  if (traits.includes('lazy')) salary = Math.round(salary*0.8/10)*10;
+  return {id:G.sid++, name:p.name, av:p.av, lvl, salary, role:'store', t:0, cl:null, training:0, done:0, traits, mood:80, fat:0};
 }
 function refreshCand(){ G.cand = [genCand(), genCand(), genCand()]; G.candDay = G.day; }
 function frontBusy(){ return G.staff.filter(s => s.cl).length; }
 function staffTick(dt){
+  const crowd = G.queue.length > 6;
   for (const s of G.staff){
     if (s.training || s.role === 'rest'){ s.cl = null; continue; }
+    s.fat = Math.min(100, (s.fat||0) + dt*0.17*(hasT(s,'calm') ? 0.5 : crowd ? 1.5 : 1));
     if (s.role === 'store'){
       s.t += dt;
       if (s.t >= storeIv(s)){ s.t = 0; storeAction(s); }
@@ -699,7 +807,7 @@ function staffFinish(s){
     G.stats.sent += n; G.today.sent += n;
   }
   removeClient(c);
-  const sat = rate(err ? 2 : 4 + (Math.random() < 0.3 ? 1 : 0), c);
+  const sat = rate((err ? 2 : 4 + (Math.random() < 0.3 ? 1 : 0)) + (hasT(s,'polite') ? 0.5 : 0), c);
   const tip = tipFor(c, sat);
   addMoney(Math.round(money*0.9) + tip); G.today.tips += tip;
   addXp(4*n);
@@ -732,6 +840,55 @@ function placeParcel(p, cell, byStaff){
   G.stats.placed++;
   if (!byStaff){ addXp(2); }
   dirty = true;
+}
+
+/* ---------- кілька відділень ---------- */
+const BR_KEYS = ['branch','city','parcels','nid','queue','cid','truck','trucksDone','hand','up','staff','cand','candDay','sid','regs','rating','dirt','decor'];
+function branchSnap(){ const o = {}; for (const k of BR_KEYS) o[k] = G[k]; return JSON.parse(JSON.stringify(o)); }
+function newBranchState(name, city){
+  const d = newGame(G.nick, name); const o = {};
+  for (const k of BR_KEYS) o[k] = d[k];
+  o.city = city; o.branch = name; o.money = undefined; return o;
+}
+function switchBranch(i){
+  if (G.phase !== 'night') return toast('Перемикатись між відділеннями можна вночі', 'bad');
+  const other = G.others[i]; if (!other) return;
+  const cur = branchSnap();
+  for (const k of BR_KEYS) if (other[k] !== undefined) G[k] = other[k];
+  G.others[i] = cur;
+  FLOW = null; closeModal(); save(); cloudSave(true);
+  toast(`🏤 Ви тепер у відділенні «${esc(G.branch)}» (${esc(G.city)})`, 'good'); dirty = true;
+}
+function buyBranch(){
+  const n = G.others.length, cost = BRANCH_COST[n];
+  if (cost === undefined) return;
+  if (G.rank < 2 + n) return toast('Потрібна вища посада', 'bad');
+  if (G.money < cost) return toast('Не вистачає грошей', 'bad');
+  const city = $('#brcity').value, name = ($('#brnew').value || '').trim().slice(0,40) || `Відділення в м. ${city}`;
+  G.money -= cost; G.others.push(newBranchState(name, city));
+  sCash(); closeModal(); toast(`🎉 Відкрито нове відділення: ${esc(name)}! Найміть туди персонал — перемкніться на нього вночі.`, 'gold');
+  save(); dirty = true;
+}
+// неактивні відділення працюють самі — на персоналі
+function simOthers(){
+  const rep = [];
+  for (const b of G.others){
+    let inc = 0, sal = 0, lv = 0, work = 0;
+    for (const s of b.staff || []){
+      if (s.role === 'rest'){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); continue; }
+      work++; sal += s.salary; lv += s.lvl;
+      const k = (s.role === 'store' ? 140 : 280) * s.lvl / staffMul(s);
+      inc += k;
+      s.fat = Math.min(100, (s.fat||0) + 25); s.mood = clamp((s.mood ?? 80) - 5, 0, 100); s.fat = Math.max(0, s.fat - 20);
+    }
+    const front = (b.staff||[]).some(s => s.role === 'issue' || s.role === 'accept');
+    inc = Math.round(inc * (b.rating/4) * (1 + (b.up.tier||0)*0.3) * (1 + (b.up.ads||0)*0.1) * (front ? 1 : 0.3));
+    b.rating = clamp(b.rating + (work ? (3.4 + lv/work*0.3 - b.rating)*0.15 : -0.08), 1, 5);
+    G.money += inc - sal; if (inc > 0) G.stats.earned += inc;
+    G.stats.issued += Math.round(inc/40);
+    rep.push({name:b.branch, inc:inc - sal, rating:b.rating, note: !work ? 'немає персоналу!' : !front ? 'немає нікого на видачі' : ''});
+  }
+  return rep;
 }
 
 /* ---------- день: свята, погода, перевірка, світло ---------- */
@@ -799,7 +956,8 @@ function cleanHall(){
 /* ---------- день ---------- */
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null;
-  rollDay();
+  rollDay(); genTasks();
+  G.staff.forEach(s => { s.bonusDay = 0; });
   if (G.candDay < G.day || !G.cand.length) refreshCand();
   truckArrive('m');
   TAB = 'ramp';
@@ -819,13 +977,27 @@ function endDay(){
   // навчання
   const trained = [];
   for (const s of G.staff) if (s.training && s.training <= G.day){ s.training = 0; s.lvl = Math.min(5, s.lvl + 1); trained.push(s); }
+  // настрій і втома персоналу
+  const quit = [];
+  for (const s of G.staff){
+    if (s.role === 'rest'){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); }
+    else {
+      s.mood = clamp((s.mood ?? 80) - ((s.fat||0) > 60 ? 12 : 4) * (hasT(s,'cheerful') ? 0.5 : 1) + (G.up.coffee ? 3 : 0) + (decorSat() > 0.2 ? 2 : 0), 0, 100);
+      s.fat = Math.max(0, (s.fat||0) - 45);
+    }
+    if (s.mood < 15 && Math.random() < 0.4) quit.push(s);
+  }
+  if (quit.length) G.staff = G.staff.filter(s => !quit.includes(s));
+  if (!G.today.angry) countTask('noangry', 1);
+  const rankBonus = RANKS[G.rank].bonus; if (rankBonus){ G.money += rankBonus; G.stats.earned += rankBonus; }
+  const branchRep = simOthers();
   // термін зберігання 5 днів
   const old = G.parcels.filter(p => p.state === 'cell' && G.day - p.inDay >= 5);
   if (old.length){ G.parcels = G.parcels.filter(p => !old.includes(p)); G.rating = clamp(G.rating - 0.02*old.length, 1, 5); }
-  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res};
+  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length};
   G.ev = null; G.eve = false; G.outage = null; G.insp = null;
   G.day++; G.phase = 'night'; G.time = 480;
-  refreshCand();
+  refreshCand(); checkAch();
   save(); cloudSave(true);
   showDaySummary(sum);
   dirty = true;
@@ -881,7 +1053,7 @@ function renderTop(){
     ${G.phase==='day' ? `<span class="pill" title="${(WEATHER[G.weather]||WEATHER.sun).n}">${(WEATHER[G.weather]||WEATHER.sun).e}${curEvent() ? ' ' + curEvent().e : ''}${manualMode() ? ' 🔦' : ''}</span>` : ''}
     <span class="pill" id="money">💰 ${fmt(G.money)} ₴</span>
     <span class="pill" title="Рейтинг відділення">⭐ <span id="rat">${G.rating.toFixed(2)}</span></span>
-    <span class="pill">Рів. ${G.level}</span>
+    <span class="pill" title="${RANKS[G.rank].n}">${RANKS[G.rank].e} Рів. ${G.level}</span>
     ${G.phase==='day' ? `<button class="topbtn" data-act="pause" title="Пауза">${paused?'▶️':'⏸️'}</button>
     <button class="topbtn" data-act="speed" title="Швидкість">⏩×${G.settings.speed}</button>` : ''}
     <button class="topbtn" data-act="savenow" title="Зберегти">💾</button>
@@ -894,14 +1066,14 @@ function renderTabs(){
   const pile = G.parcels.filter(p => p.state === 'pile').length;
   const tr = G.parcels.filter(p => p.state === 'truck').length + (G.truck && G.truck.kind==='out' ? G.parcels.filter(p=>p.state==='outgoing').length : 0);
   const free = G.queue.filter(c => !c.by).length;
-  const T = [['hall','🏢','Зал', free],['store','📦','Склад', pile],['ramp','🚚','Рампа', G.truck ? tr || '!' : 0],['staff','👥','Персонал',0],['ups','🔧','Покращення', affordableUps()],['online','🌐','Онлайн', NET.unread]];
+  const T = [['hall','🏢','Зал', free],['store','📦','Склад', pile],['ramp','🚚','Рампа', G.truck ? tr || '!' : 0],['staff','👥','Персонал',0],['ups','🔧','Покращення', affordableUps()],['career','🎯','Кар’єра', rankReady() ? '!' : 0],['online','🌐','Онлайн', NET.unread]];
   $('#tabs').innerHTML = T.map(([k,i,n,b]) => `<button class="${TAB===k?'on':''}" data-tab="${k}"><span class="ti">${i}</span>${n}${b?`<span class="badge">${b}</span>`:''}</button>`).join('');
 }
 function render(){
   if (!G) return;
   renderTop(); renderTabs();
   const v = $('#view');
-  const fn = {hall:viewHall, store:viewStore, ramp:viewRamp, staff:viewStaff, ups:viewUps, online:viewOnline}[TAB];
+  const fn = {hall:viewHall, store:viewStore, ramp:viewRamp, staff:viewStaff, ups:viewUps, career:viewCareer, online:viewOnline}[TAB];
   const scroll = window.scrollY;
   v.innerHTML = fn();
   if (TAB === 'online') afterOnline();
@@ -954,7 +1126,7 @@ function viewHall(){
     + (I && I.state === 'on' ? `<div class="banner insp">👔 <b>Перевірка регіонального менеджера</b> до ${hhmm(I.until)} — тримай зал чистим, обслуговуй швидко і без помилок!</div>` : '')
     + (O && O.on ? (G.up.gen ? '<div class="banner">🔌 Відключення світла — працює генератор.</div>' : `<div class="banner dark">🔦 <b>Світла немає</b> до ≈${hhmm(O.to)}: термінал і сканер не працюють, тільки готівка, персонал повільніший. Купи 🔌 генератор у покращеннях.</div>`) : '');
   const dirtLbl = G.dirt < 25 ? 'чисто ✨' : G.dirt < 60 ? 'трохи брудно' : 'брудно! клієнти незадоволені';
-  return `${banners}<div class="card"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
+  return `${banners}<div class="card hallcard" style="background:${(WALLS[G.decor.wall]||WALLS.cream)[1]}">${decorStrip()}<h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
     <div class="queue">${G.queue.length ? G.queue.map(clientHTML).join('') : '<div class="mute" style="padding:30px 6px">Поки нікого… Розклади посилки по комірках, щоб клієнти могли їх забрати.</div>'}</div>
     <div class="counter"></div>
     <div class="windows">${wins}</div></div>
@@ -964,6 +1136,10 @@ function viewHall(){
       <span>💰 зароблено: <b>${fmt(t.earned)} ₴</b></span><span>😠 пішли: <b>${t.angry}</b></span></div>
       <div class="mute" style="margin-top:6px">🚚 Машини: 08:00 і 13:00 привозять посилки · 18:00 забирає відправлення · 20:00 кінець зміни</div></div>
     ${regsCard()}`;
+}
+function decorStrip(d){
+  d = d || G.decor; const it = Object.keys((d && d.items) || {}).filter(k => DECOR[k]);
+  return it.length ? `<div class="decor">${it.map(k => `<span title="${DECOR[k].n}">${DECOR[k].e}</span>`).join('')}</div>` : '';
 }
 function nightForecast(){
   const t = eventFor(G.day), n1 = eventFor(G.day + 1);
@@ -1043,16 +1219,21 @@ function viewStaff(){
   const max = staffMax();
   const staff = G.staff.map(s => `<div class="card staff"><div class="av">${s.av}</div><div style="flex:1">
       <b>${esc(s.name)}</b> <span class="stars">${stars(s.lvl)}</span>
+      ${(s.traits||[]).length ? `<div class="traits">${s.traits.map(t => `<span title="${TRAITS[t].d}">${TRAITS[t].n}</span>`).join('')}</div>` : ''}
+      <div class="mbars"><span>😊 Настрій</span><div class="lvl"><i class="on" style="flex:none;width:${s.mood ?? 80}%;background:${(s.mood??80)<30?'var(--red)':(s.mood??80)<60?'var(--amber)':'var(--green)'}"></i></div>
+        <span>😩 Втома</span><div class="lvl"><i class="on" style="flex:none;width:${s.fat||0}%;background:${(s.fat||0)>60?'var(--red)':'var(--amber)'}"></i></div></div>
       <div class="mute">Зарплата ${s.salary} ₴/день · ${s.training ? '📚 На навчанні до кінця дня ' + s.training : s.role==='store' ? `розкладає посилку кожні ${storeIv(s).toFixed(1)} с` : s.role==='rest' ? 'Вихідний (без зарплати)' : `обслуговує клієнта за ${serveT(s)} с, помилки ${Math.round(errCh(s)*100)}%`}</div>
       ${s.training ? '' : `<div class="roles">${Object.entries(ROLES).map(([k,n]) => `<button class="${s.role===k?'on':''}" data-act="role" data-id="${s.id}" data-role="${k}">${n}</button>`).join('')}</div>`}
       <div class="row" style="margin-top:6px">
         ${s.lvl < 5 && !s.training ? `<button class="sm" data-act="train" data-id="${s.id}">📚 Навчання · ${fmt(trainCost(s))} ₴</button>` : ''}
+        <button class="sm" data-act="bonus" data-id="${s.id}" ${s.bonusDay === G.day ? 'disabled' : ''}>💵 Премія 200 ₴</button>
         <button class="sm ghost" data-act="fire" data-id="${s.id}">Звільнити</button></div></div></div>`).join('');
   const cand = G.cand.map(s => `<div class="card staff"><div class="av">${s.av}</div><div style="flex:1"><b>${esc(s.name)}</b> <span class="stars">${stars(s.lvl)}</span>
+      ${(s.traits||[]).length ? `<div class="traits">${s.traits.map(t => `<span title="${TRAITS[t].d}">${TRAITS[t].n}</span>`).join('')}</div><div class="mute">${s.traits.map(t => TRAITS[t].d).join('; ')}</div>` : ''}
       <div class="mute">Хоче ${s.salary} ₴/день</div><button class="ok sm" style="margin-top:6px" data-act="hire" data-id="${s.id}" ${G.staff.length>=max?'disabled':''}>Найняти</button></div></div>`).join('');
   const sal = G.staff.reduce((a,s) => a + (s.role==='rest'?0:s.salary), 0);
   return `<div class="card"><h3>👥 Персонал <span class="mute">(${G.staff.length}/${max})</span></h3>
-     <div class="mute">Зарплати: <b>${fmt(sal)} ₴</b> в кінці кожного дня. Видача і прийом потребують вільних віконець (зараз ${G.up.windows}, перше — ваше). Склад розвантажує машину, розкладає посилки і вантажить відправлення. Навчання триває до кінця дня, і працівник у цей час не працює.</div></div>
+     <div class="mute">Зарплати: <b>${fmt(sal)} ₴</b> в кінці кожного дня. Видача і прийом потребують вільних віконець (зараз ${G.up.windows}, перше — ваше). Склад розвантажує машину, розкладає посилки і вантажить відправлення. Навчання триває до кінця дня, і працівник у цей час не працює. Втома росте за роботою (особливо коли черга велика), вихідний повністю відновлює сили. Якщо настрій впаде дуже низько — працівник може звільнитись.</div></div>
      ${staff || '<div class="card mute">Поки працюєте самі. Найміть когось, щоб було легше!</div>'}
      <div class="card"><h3>🧾 Кандидати <span class="mute">(оновлюються щодня)</span></h3>${G.staff.length>=max?'<div class="mute">Більше місць немає — розширте відділення.</div>':''}</div>
      <div class="grid2">${cand}</div>`;
@@ -1060,7 +1241,7 @@ function viewStaff(){
 function upNext(k){ const u = UPS[k]; const i = G.up[k] - u.start; return i < u.costs.length ? {cost:u.costs[i], need:u.need[i]} : null; }
 function affordableUps(){ let n = 0; for (const k in UPS){ const nx = upNext(k); if (nx && G.level >= nx.need && G.money >= nx.cost) n++; } return n; }
 function viewUps(){
-  return `<div class="ups">${Object.entries(UPS).map(([k,u]) => {
+  return decorCard() + `<div class="ups">${Object.entries(UPS).map(([k,u]) => {
     const l = G.up[k], nx = upNext(k), max = u.start + u.costs.length;
     const bars = Array.from({length:max}, (_,i) => `<i class="${i < l ? 'on' : ''}"></i>`).join('');
     return `<div class="card up"><div class="row"><span class="ue">${u.e}</span><div style="flex:1"><b>${u.n}</b><div class="mute">рівень ${l}/${max}</div></div></div>
@@ -1073,6 +1254,48 @@ function viewUps(){
 }
 
 /* ---------- обслуговування гравцем ---------- */
+function decorCard(){
+  const d = G.decor;
+  return `<div class="card"><h3>🎨 Оформлення залу</h3><div class="mute">Затишний зал — терплячіші клієнти, кращі оцінки й чайові. Твій зал бачать інші гравці, коли заходять у гості.</div>
+    <div class="mute" style="margin:8px 0 4px">Колір стін:</div><div class="row">${Object.entries(WALLS).map(([k,[n,c,pr]]) => `<button class="sm ${d.wall===k?'on':''}" style="background:${c};border:2px solid ${d.wall===k?'var(--ink)':'var(--line)'}" data-act="wall" data-k="${k}">${n}${pr && !(d.walls||[]).includes(k) ? ` · ${pr} ₴` : ''}</button>`).join('')}</div>
+    <div class="mute" style="margin:10px 0 4px">Предмети:</div><div class="opts">${Object.entries(DECOR).map(([k,x]) => {
+      const own = d.items[k];
+      const eff = [x.pat ? `терпіння +${Math.round(x.pat*100)}%` : '', x.sat ? `оцінки +${x.sat}` : '', x.tip ? `чайові +${Math.round(x.tip*100)}%` : ''].filter(Boolean).join(', ');
+      return `<button class="${own?'on':''}" data-act="decor" data-k="${k}" ${!own && G.money < x.c ? 'disabled' : ''}><span style="font-size:24px">${x.e}</span><br>${x.n}<br><small>${own ? '✅ є' : fmt(x.c) + ' ₴'} · ${eff}</small></button>`; }).join('')}</div></div>`;
+}
+function viewCareer(){
+  const R0 = RANKS[G.rank], nx = RANKS[G.rank + 1], par = G.stats.issued + G.stats.sent;
+  let rankH = `<div class="card"><h3>${R0.e} Посада: ${R0.n}</h3>${R0.bonus ? `<div class="mute">Надбавка ${fmt(R0.bonus)} ₴ щодня</div>` : ''}`;
+  if (nx){
+    const n = nx.need, req = [[`Рівень ${n.level}`, G.level >= n.level, `${G.level}/${n.level}`], [`${fmt(n.parcels)} посилок`, par >= n.parcels, `${fmt(par)}/${fmt(n.parcels)}`]];
+    if (n.rating) req.push([`Рейтинг ${n.rating}`, G.rating >= n.rating, G.rating.toFixed(2)]);
+    if (n.branches) req.push([`${n.branches} відділення`, 1 + G.others.length >= n.branches, `${1 + G.others.length}/${n.branches}`]);
+    rankH += `<p>Наступна посада: <b>${nx.e} ${nx.n}</b> (надбавка ${fmt(nx.bonus)} ₴/день)</p><ul>${req.map(([t,ok,v]) => `<li>${ok ? '✅' : '⬜'} ${t} <span class="mute">(${v})</span></li>`).join('')}</ul>
+      ${rankReady() ? '<button class="pri" data-act="promote">🎖️ Отримати підвищення</button>' : ''}`;
+  } else rankH += '<p>👑 Ви досягли вершини кар’єри!</p>';
+  rankH += '</div>';
+  const tasksH = `<div class="card"><h3>🎯 Завдання на сьогодні</h3>${G.phase === 'night' && !G.tasks.length ? '<div class="mute">Завдання з’являться, коли відкриєш відділення.</div>' :
+    G.tasks.map(t => `<div class="task ${t.done?'done':''}"><div style="flex:1">${t.done?'✅':'🎯'} ${taskText(t)}<div class="lvl"><i class="on" style="flex:none;width:${Math.min(100, t.prog/t.n*100)}%"></i></div></div><b>${fmt(t.r)} ₴</b></div>`).join('')}
+    ${G.phase === 'night' && G.tasks.length ? '<div class="mute">Нові завдання будуть зранку.</div>' : ''}</div>`;
+  const nb = BRANCH_COST[G.others.length];
+  const brH = `<div class="card"><h3>🏤 Мої відділення</h3>
+    <div class="task"><div style="flex:1"><b>${esc(G.branch)}</b> <span class="mute">(${esc(G.city)}) · зараз тут</span></div><span>⭐ ${G.rating.toFixed(2)}</span></div>
+    ${G.others.map((b,i) => `<div class="task"><div style="flex:1"><b>${esc(b.branch)}</b> <span class="mute">(${esc(b.city)}) · персонал: ${(b.staff||[]).length}</span></div><span>⭐ ${b.rating.toFixed(2)}</span> <button class="sm" data-act="switchbr" data-id="${i}" ${G.phase!=='night'?'disabled':''}>Перейти</button></div>`).join('')}
+    <div class="mute" style="margin-top:6px">Відділення, де вас немає, працюють самі — на найнятому там персоналі (потрібні люди на видачі). Перемикатись можна вночі. Гроші, рівень і кар’єра спільні.</div>
+    ${nb !== undefined ? `<button style="margin-top:8px" class="${G.rank >= 2 + G.others.length && G.money >= nb ? 'ok' : ''}" data-act="newbranch" ${G.rank < 2 + G.others.length ? 'disabled' : ''}>${G.rank < 2 + G.others.length ? `🔒 Потрібна посада «${RANKS[2 + G.others.length].n}»` : `➕ Відкрити ${G.others.length ? 'третє' : 'друге'} відділення · ${fmt(nb)} ₴`}</button>` : ''}</div>`;
+  const achH = `<div class="card"><h3>🏆 Досягнення</h3><div class="achs">${ACH.map(a => {
+      const tier = G.ach[a.k] || 0, v = a.g(), nxt = a.t[tier];
+      return `<div class="ach ${tier?'got':''}"><div class="ae">${a.e}</div><b>${a.n}</b><div class="stars">${'★'.repeat(tier)}${'☆'.repeat(a.t.length - tier)}</div><div class="mute">${a.d}: ${fmt(v)}${nxt !== undefined ? ' / ' + fmt(nxt) : ' ✅'}</div></div>`; }).join('')}</div>
+    ${(G.badges||[]).length ? `<h3 style="margin-top:10px">🏅 Значки</h3><div class="row">${G.badges.map(b => `<span class="badge2" title="${esc(b.t)}">${b.e} ${esc(b.t)}</span>`).join('')}</div>` : ''}</div>`;
+  return rankH + tasksH + brH + achH;
+}
+function showNewBranch(){
+  const used = [G.city, ...G.others.map(b => b.city)];
+  showModal('🏤 Нове відділення', `<p>Оберіть місто і назву нового відділення.</p>
+    <select id="brcity">${CITIES.filter(c => !used.includes(c)).map(c => `<option>${c}</option>`).join('')}</select>
+    <input id="brnew" maxlength="40" placeholder="Назва (наприклад, Відділення №2, вул. Шевченка)" style="margin-top:8px">
+    <button class="pri" style="width:100%;margin-top:10px" data-act="buybranch">Відкрити · ${fmt(BRANCH_COST[G.others.length])} ₴</button>`);
+}
 function openServe(id){
   if (G.phase !== 'day') return;
   if (FLOW){ FLOW.hidden = false; renderFlow(); return; }
@@ -1087,7 +1310,7 @@ function terminalRows(c){
   const phones = [...new Set(G.parcels.filter(p => p.state === 'cell').map(p => p.phone))].filter(p => p !== c.phone);
   return shuffle([c.phone, ...shuffle(phones).slice(0, manualMode() ? 10 : 5)]);
 }
-function mistake(msg){ FLOW.mist++; if (G.insp && G.insp.state === 'on') G.insp.mist++; G.today.mist = (G.today.mist||0) + 1; sErr(); toast('❌ ' + msg, 'bad'); const c = flowClient(); if (c) c.pat -= 4; }
+function mistake(msg){ FLOW.mist++; if (G.today.streak){ G.today.streak = 0; } if (G.insp && G.insp.state === 'on') G.insp.mist++; G.today.mist = (G.today.mist||0) + 1; sErr(); toast('❌ ' + msg, 'bad'); const c = flowClient(); if (c) c.pat -= 4; }
 function stepsBar(names, cur){ return `<div class="steps">${names.map((n,i) => `<i class="${i<=cur?'on':''}" title="${n}"></i>`).join('')}</div>`; }
 function speaker(c, text){ return `<div class="speaker"><span class="av">${c.av}</span><div class="bubble" style="flex:1">${text}</div></div>`; }
 function payHTML(c, total, label){
@@ -1362,7 +1585,7 @@ function flowAct(act, el){
   }
   if (act === 'change'){
     const total = flowTotal(c);
-    if (+v === FLOW.pay.given - total){ sCash(); nextAfterPay(c); } else mistake('Неправильна решта!');
+    if (+v === FLOW.pay.given - total){ sCash(); nextAfterPay(c); countTask('cash', 1); } else mistake('Неправильна решта!');
     return renderFlow();
   }
   if (act === 'give') return finishGet(c);
@@ -1425,8 +1648,11 @@ function finishGet(c){
   G.stats.issued += ps.length; G.today.issued += ps.length;
   const sat = rate(flowSat(c), c);
   const tip = tipFor(c, sat);
+  const clean = FLOW.mist === 0;
   FLOW = null; closeModal(); removeClient(c);
   addMoney(money + tip); G.today.tips += tip; addXp(10*ps.length);
+  G.today.streak = clean ? (G.today.streak||0) + ps.length : 0; countTask('streak', G.today.streak, true);
+  if (c.reg) countTask('regs', 1); if (tip) countTask('tips', 1);
   sCash();
   toast(`${'⭐'.repeat(Math.round(sat))} +${money} ₴${tip?` · чайові ${tip} ₴ 💝`:''}`, 'good');
 }
@@ -1441,6 +1667,7 @@ function finishSend(c){
   const tip = tipFor(c, sat);
   FLOW = null; closeModal(); removeClient(c);
   addMoney(tot.sum + tip); G.today.tips += tip; addXp(12*n);
+  countTask('send', n); if (c.reg) countTask('regs', 1); if (tip) countTask('tips', 1);
   sCash();
   toast(`${'⭐'.repeat(Math.round(sat))} +${tot.sum} ₴${tip?` · чайові ${tip} ₴ 💝`:''}`, 'good');
 }
@@ -1465,6 +1692,10 @@ function showDaySummary(s){
     ${s.returned?`<span>🔙 Не розвантажено з машин</span><b>${s.returned}</b>`:''}
     ${s.insp ? `<span>👔 Перевірка менеджера</span><b>${s.insp.avg}/5${s.insp.bonus ? ' · +' + fmt(s.insp.bonus) + ' ₴' : ''}</b>` : ''}
     <span>⭐ Рейтинг відділення</span><b>${G.rating.toFixed(2)}</b></div>
+    ${s.rankBonus ? `<p>${RANKS[G.rank].e} Надбавка за посаду «${RANKS[G.rank].n}»: <b>+${fmt(s.rankBonus)} ₴</b></p>` : ''}
+    ${s.tasks ? `<p>🎯 Виконано завдань: ${s.tasks}/${G.tasks.length}</p>` : ''}
+    ${(s.branchRep||[]).map(b => `<p>🏤 ${esc(b.name)}: ${b.inc >= 0 ? '+' : ''}${fmt(b.inc)} ₴ · ⭐ ${b.rating.toFixed(2)}${b.note ? ' · ' + b.note : ''}</p>`).join('')}
+    ${(s.quit||[]).length ? `<p class="fr">😞 Звільнились через поганий настрій: ${s.quit.map(x => esc(x.name)).join(', ')}</p>` : ''}
     ${s.trained.length ? `<p>📚 Навчання завершили: ${s.trained.map(x => esc(x.name) + ' → ' + stars(x.lvl)).join(', ')}</p>` : ''}
     ${G.money < 0 ? '<p class="fr"><b>⚠ Гроші в мінусі! Заробіть більше або зменшіть персонал.</b></p>' : ''}
     <p class="mute">Посилки зберігаються в комірках 5 днів, потім повертаються відправнику.</p>
@@ -1515,6 +1746,31 @@ function act(a, el){
     case 'mclose': if (modalIsFlow && FLOW){ FLOW.hidden = true; closeModal(); dirty = true; } else closeModal(); return;
     case 'startday': return startDay();
     case 'clean': return cleanHall();
+    case 'promote': {
+      if (!rankReady()) return; G.rank++; sCash(); save(); cloudSave(true);
+      showModal('🎖️ Підвищення!', `<div class="bigstart"><div class="e">${RANKS[G.rank].e}</div><h2>${RANKS[G.rank].n}</h2><p>Вітаємо з новою посадою! Щоденна надбавка: <b>${fmt(RANKS[G.rank].bonus)} ₴</b>.</p>${G.rank >= 2 ? '<p>🏤 Тепер можна відкрити ще одне відділення в іншому місті (вкладка «Кар’єра»).</p>' : ''}</div><button class="pri" style="width:100%" data-act="mclose">Дякую!</button>`);
+      dirty = true; return;
+    }
+    case 'newbranch': return showNewBranch();
+    case 'buybranch': return buyBranch();
+    case 'switchbr': return switchBranch(id);
+    case 'wall': {
+      const k = el.dataset.k, w = WALLS[k]; if (!w) return;
+      G.decor.walls = G.decor.walls || [];
+      if (w[2] && !G.decor.walls.includes(k)){ if (G.money < w[2]) return toast('Не вистачає грошей', 'bad'); G.money -= w[2]; G.decor.walls.push(k); sCash(); }
+      G.decor.wall = k; save(); dirty = true; return;
+    }
+    case 'decor': {
+      const k = el.dataset.k, x = DECOR[k]; if (!x || G.decor.items[k]) return;
+      if (G.money < x.c) return toast('Не вистачає грошей', 'bad');
+      G.money -= x.c; G.decor.items[k] = 1; sCash(); toast(`${x.e} ${x.n} тепер у залі!`, 'good'); save(); dirty = true; return;
+    }
+    case 'bonus': {
+      const s = G.staff.find(s => s.id === id); if (!s || s.bonusDay === G.day) return;
+      if (G.money < 200) return toast('Не вистачає грошей', 'bad');
+      G.money -= 200; s.bonusDay = G.day; s.mood = Math.min(100, (s.mood ?? 80) + 25); sCash();
+      toast(`💵 ${esc(s.name)} дуже вдячний(на) за премію!`, 'good'); dirty = true; return;
+    }
     case 'pause': paused = !paused; dirty = true; return;
     case 'speed': G.settings.speed = G.settings.speed === 1 ? 2 : G.settings.speed === 2 ? 3 : 1; dirty = true; return;
     case 'savenow': save(); cloudSave(true).then(ok => toast(ok ? '💾 Збережено (і в хмару)' : '💾 Збережено на пристрої', 'good')); return;
@@ -1543,12 +1799,12 @@ function act(a, el){
       const p = G.parcels.find(p => p.id === id); if (!p || p.state !== 'truck') return;
       const need = G.up.cart ? 1 : p.s>=4?3:p.s===3?2:1;
       p.unl++; beep(400 + p.unl*120, 0.05, 'triangle');
-      if (p.unl >= need){ p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; addXp(1); }
+      if (p.unl >= need){ p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; addXp(1); countTask('unload', 1); }
       dirty = true; return;
     }
     case 'unloadall': {
       const ps = G.parcels.filter(p => p.state === 'truck');
-      ps.forEach(p => { p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; });
+      ps.forEach(p => { p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; }); countTask('unload', ps.length);
       G.time += ps.length; toast(`Розвантажено ${ps.length} посилок, пройшло ${ps.length} хв`); dirty = true; return;
     }
     case 'load': { const p = G.parcels.find(p => p.id === id); if (p && p.state === 'outgoing'){ p.state = 'loaded'; beep(500,0.05,'triangle'); addXp(1); } dirty = true; return; }
