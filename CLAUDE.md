@@ -34,5 +34,7 @@ python3 build.py && git add -A && git commit -m "..." && git push origin main
 - Regulars `REGS` (unlock by level, hearts 0–5 raise tips), staff (roles issue/accept/store/rest, lvl 1–5, training costs 400×lvl, front staff need windows), upgrades `UPS` (start, costs, need level).
 - Rendering: full `render()` on `dirty`, postponed while a pointer is down so taps aren't lost; `liveUpdate()` updates clock/patience bars.
 
-## Ideas for later (owner wants to keep improving)
-Dev panel for the owner, visiting other branches, events (holidays rush), returns/огляд посилки, poshtomat refill mini-game, achievements, sounds/music, PWA install.
+## Status / next steps
+- v1 released 2026-10-31 (build 202610311910): full day loop, regulars, staff, upgrades, online (register, cloud save, leaderboard, chat). Owner liked it.
+- `IDEAS.md` — numbered list of 22 ideas offered to the owner; he picks numbers for the next update (my suggested top: 1, 6, 7, 11, 16, 19). Ask him which ones, and ask for real situations from his operator job to turn into mechanics.
+- Test locally: `python3 -m http.server` in the repo + Playwright; block `supabase.co` in tests (or delete test players from `np_players`/`np_chat` afterwards).
