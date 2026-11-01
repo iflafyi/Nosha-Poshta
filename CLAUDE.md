@@ -52,5 +52,7 @@ python3 build.py && git add -A && git commit -m "..." && git push origin main
 - v2 released 2026-10-31 in 5 deploys: all 22 ideas from `IDEAS.md` implemented (counter situations + scanner, events/weather/inspection/outage, tasks/achievements/career/branches/decor/staff traits, visits/gifts/weekly contest/dev panel, animated hall/sounds/PWA).
 - v3 (2026-10-31): 3D hall (see above).
 - v4 (2026-11-01): email + password accounts with multi-device sync.
+- Chat of 2026-11-01 ended right after v4 deploy (build 202611011006). Ask the owner whether he linked his branch to an account (⚙️ → 👤 Акаунт) and whether sync between phone and PC works for him.
+- Note: on the mobile app the Supabase `apply_migration` confirmation got auto-cancelled; DB changes worked from the PC. If it happens again, ask him to approve from the PC or run the SQL from `sql/` in Supabase SQL Editor.
 - Next: ask the owner how the 3D hall feels on his phone (performance, camera); ask the owner for feedback and real situations from his operator job to turn into mechanics; balance (event frequency, rank requirements, branch income) may need tuning after he plays.
 - Test locally: `python3 -m http.server` in the repo + Playwright; block `supabase.co` in tests (or delete test players from `np_players`/`np_chat` afterwards).
