@@ -240,7 +240,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011052; // ставиться build.py
+const GAME_BUILD = 202611011055; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -1068,10 +1068,10 @@ function staffTick(dt){
     }
   }
 }
-function staffFinish(s){
+function staffFinish(s, forceErr){
   const c = G.queue.find(c => c.id === s.cl); s.cl = null; s.t = 0;
-  if (!c) return;
-  const err = Math.random() < errCh(s);
+  if (!c) return 0;
+  const err = forceErr !== undefined ? forceErr : Math.random() < errCh(s);
   let money = 0, n = 0, codCash = 0;
   if (c.kind === 'get'){
     let ps = G.parcels.filter(p => c.pids.includes(p.id));
@@ -1111,6 +1111,7 @@ function staffFinish(s){
   addMoney(Math.round(money*0.9) + tip); G.today.tips += tip;
   addXp(4*n);
   if (err) toast(`⚠️ ${esc(s.name)} помилилась(вся) з клієнтом — оцінка низька`, 'bad');
+  return Math.round(money);
 }
 function storeAction(s){
   const truckBox = G.parcels.find(p => p.state === 'truck');
@@ -1560,7 +1561,7 @@ function liveUpdate(){
 }
 function clientHTML(c){
   const r = clamp(c.pat/c.max, 0, 1);
-  const who = c.by === 'me' ? '<div class="who">у вас</div>' : c.by ? `<div class="who">${esc((G.staff.find(s=>s.id===c.by)||{}).name||'')}</div>` : '';
+  const who = c.by === 'me' ? '<div class="who">у вас</div>' : c.by === 'coop' ? `<div class="who">🤝 ${esc((NET.coop && NET.coop.peer && NET.coop.peer.nick) || 'друг')}</div>` : c.by ? `<div class="who">${esc((G.staff.find(s=>s.id===c.by)||{}).name||'')}</div>` : '';
   const kd = c.kind === 'get' ? `📥 отримати${c.pids.length>1?' ×'+c.pids.length:''}` : `📤 відправити${c.items.length>1?' ×'+c.items.length:''}`;
   return `<div class="client ${c.reg?'reg':''} ${c.by==='me'?'me':''}" data-act="${c.by?'':'serve'}" data-id="${c.id}">
     <div class="av">${c.av}</div><div class="nm">${esc(c.name)}</div><div class="kd">${kd}</div>${who}
@@ -2374,7 +2375,7 @@ function showModal(title, html, isFlow=false){
   m.innerHTML = `<div class="mbox"><div class="mhead">${title}<button class="x" data-act="mclose">${isFlow?'⤵ Згорнути':'✕'}</button></div><div class="mbody">${html}</div></div>`;
   m.classList.remove('hidden');
 }
-function closeModal(){ $('#modal').classList.add('hidden'); $('#modal').innerHTML = ''; modalIsFlow = false; }
+function closeModal(){ $('#modal').classList.add('hidden'); $('#modal').innerHTML = ''; modalIsFlow = false; modalIsCoop = false; }
 function showDaySummary(s){
   const avg = s.served ? (s.satSum/s.served).toFixed(1) : '—';
   showModal(`🌙 День ${s.day} завершено`, `<div class="kv">
@@ -2418,6 +2419,8 @@ function showGuide(){
     <li><b>💰 Каса:</b> післяплату ставиш, коли продавець відправляє товар покупцю (комісія 20 ₴ + 2%). Якщо отримувач сперечається про суму — показуй ТТН, бо недоплату доведеться покривати з каси. Увечері — <b>🧮 звірка каси</b>: перерахуй купюри; неправильна решта чи недоплата = недостача.</li>
     <li><b>📝 Пошкоджена посилка:</b> склади акт — упаковка пошкоджена → винен перевізник; коробка ціла, а крихке без захисту → відправник. <b>🌍 За кордон:</b> перевір, чи річ не заборонена (акумулятори, рідини, ліки, сало, алкоголь), заповни митну декларацію CN22.</li>
     <li><b>🟥 Поштомат</b> (покращення): завантажуй туди малі посилки на «Складі», клієнти заберуть самі. Якщо поштомат видає помилку — обери правильну дію. <b>🤝 Бізнес-клієнти</b> (Кар’єра): магазини приносять партії коробок за договором.</li>
+    <li><b>🗺️ Мережа:</b> у «Кар’єрі» обери район головного відділення і відкривай до 5 відділень у різних районах — від району залежать клієнти. Там же 🔥 стрік щоденної гри і 🗓️ цілі місяця. <b>🧊 3D:</b> кнопки 🏢 📦 🗺️ показують зал, склад з рампою, кухню й туалет; тап по машині — розвантажити коробку.</li>
+    <li><b>🤝 Кооператив</b> (Онлайн): відкрий зміну і дай другу код — він обслуговуватиме твоїх клієнтів зі свого пристрою в реальному часі.</li>
     <li><b>Сезони:</b> у листопаді — пік Чорної п’ятниці, з 10 грудня — новорічний пік (за справжнім календарем). Взимку можна купити 🎄 святковий декор, а постійні клієнти приносять подарунки.</li>
     <li><b>Події:</b> свята й розпродажі (більше посилок і додаткова машина), погода, раптова перевірка менеджера (тримай зал чистим 🧹), відключення світла (купи 🔌 генератор).</li>
     <li><b>🎯 Кар’єра:</b> щоденні завдання, досягнення, підвищення до регіонального керівника і друге відділення в іншому місті. В «Покращеннях» — 🎨 оформлення залу.</li>
@@ -2589,6 +2592,12 @@ function act(a, el){
     case 'devgift': { const to = $('#devto').value || null, t = $('#devgt').value, n = Math.max(1, Math.min(999999, Math.round(+$('#devgn').value || 0)));
       devCall('np_admin_gift', {p_to:to, p_item:`dev:${t}:${n}`, p_note:$('#devgnote').value || ''}).then(r => { if (r !== null) toast(`🎁 Надіслано ${r} гравц${r === 1 ? 'ю' : 'ям'}`, 'good'); }); return; }
     case 'devchatdel': devCall('np_admin_chat_del', {p_msg:+el.dataset.id}, 'Видалено').then(() => { const m = NET.chat.find(x => x.id === +el.dataset.id); if (m) m.del = 1; drawChat(); }); return;
+    case 'coophost': return coopHost();
+    case 'coopjoin': return coopJoin();
+    case 'coopstop': return coopStop();
+    case 'cooptake': { const C = NET.coop; if (!C || !C.host || C.job || C.waiting) return; C.waiting = true; coopSend({t:'take', id:G.pid, cid:id}); setTimeout(() => { if (NET.coop) NET.coop.waiting = false; }, 4000); return; }
+    case 'coopreopen': return coopRender();
+    case 'cpphone': case 'cpcell': case 'cppay': case 'cppack': case 'cpcity': case 'cpdone': return coopAct(a, el);
     case 'wcat': NET.wcat = el.dataset.v; NET.week = null; loadWeek(); dirty = true; return;
     case 'lbsort': NET.sort = el.dataset.v; NET.top = null; loadTop(); dirty = true; return;
     case 'chatsend': return chatSend();
@@ -2853,7 +2862,7 @@ async function loadTop(){
 function connectChat(){
   if (NET.ch || !window.supabase || !NET.ok) return;
   try {
-    const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {auth:{persistSession:false, autoRefreshToken:false}});
+    const sb = NET.sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {auth:{persistSession:false, autoRefreshToken:false}});
     NET.ch = sb.channel('np-chat', {config:{broadcast:{self:false}}});
     NET.ch.on('broadcast', {event:'m'}, ({payload}) => addChat([payload]));
     NET.ch.subscribe();
@@ -2897,7 +2906,7 @@ function drawChat(){
 function viewOnline(){
   const me = `<div class="card"><h3>👤 ${esc(G.nick)} <span class="mute">${RANKS[G.rank].e} ${RANKS[G.rank].n}</span></h3><div class="mute">${G.pid ? '<span class="dot on"></span>Ви онлайн · прогрес зберігається в хмару' : 'Відділення не підключене до онлайну'}</div>
     ${G.pid ? '' : '<button class="pri sm" style="margin-top:6px" data-act="register">🌐 Підключити онлайн</button>'}</div>`;
-  const subs = [['top','🏆 Рейтинг'],['week','📅 Тиждень'],['chat','💬 Чат'],['rev','⭐ Відгуки'], ...(NET.admin ? [['dev','🛠 Розробник']] : [])];
+  const subs = [['top','🏆 Рейтинг'],['week','📅 Тиждень'],['chat','💬 Чат'],['coop', NET.coop && (NET.coop.peer || NET.coop.host) ? '🤝 Кооп 🟢' : '🤝 Кооператив'],['rev','⭐ Відгуки'], ...(NET.admin ? [['dev','🛠 Розробник']] : [])];
   const sub = `<div class="subtabs" style="flex-wrap:wrap">${subs.map(([k,n]) => `<button class="${NET.sub===k?'on':''}" data-act="onltab" data-v="${k}">${n}</button>`).join('')}</div>`;
   if (NET.sub === 'chat'){
     return me + sub + `<div class="card"><div class="chat" id="chatbox"></div><div class="row" style="flex-wrap:nowrap"><input id="chatin" maxlength="300" placeholder="Повідомлення…"><button class="pri" data-act="chatsend">➤</button></div></div>`;
@@ -2920,6 +2929,7 @@ function viewOnline(){
       r.map(x => `<div class="msg"><span class="stars">${stars(x.stars)}</span> <b data-nol10n>${esc(x.from_nick)}</b><span class="t">${new Date(x.at).toLocaleDateString('uk-UA')}</span>${x.body ? `<br>${esc(x.body)}` : ''}</div>`).join('')}</div>`;
   }
   if (NET.sub === 'dev' && NET.admin) return me + sub + viewDev();
+  if (NET.sub === 'coop') return me + sub + coopHTML();
   const sorts = [['level','Рівень'],['parcels','Посилки'],['rating','Рейтинг'],['money','Гроші']];
   const top = NET.top;
   const online = top ? top.filter(p => p.online).length : 0;
@@ -3103,6 +3113,206 @@ async function weekClaim(){
 }
 async function loadWeek(){ const cat = NET.wcat || 'parcels'; try { const r = await rpc('np_week_top', {p_cat:cat}); if ((NET.wcat || 'parcels') === cat){ NET.week = r; if (TAB === 'online') dirty = true; } } catch(e){ NET.week = NET.week || []; } }
 async function loadMyReviews(){ if (!G.pid) return; try { NET.myRev = await rpc('np_reviews_for', {p_to:G.pid}); if (TAB === 'online') dirty = true; } catch(e){} }
+
+/* ---------- кооператив: друг працює на твоїй зміні ---------- */
+// Кімната = Supabase Realtime broadcast-канал np-coop-<код>. Господар тримає стан гри, гість лише обслуговує клієнтів.
+function coopChannel(code, onMsg){
+  if (!NET.sb) connectChat();
+  if (!NET.sb) return null;
+  const ch = NET.sb.channel('np-coop-' + code, {config:{broadcast:{self:false}}});
+  ch.on('broadcast', {event:'m'}, ({payload}) => { try { onMsg(payload || {}); } catch(e){ console.warn(e); } });
+  ch.subscribe();
+  return ch;
+}
+function coopSend(m){ const C = NET.coop; if (C && C.ch) C.ch.send({type:'broadcast', event:'m', payload:{...m, from:C.role}}); }
+function coopHost(){
+  if (!G.pid) return toast('Спершу підключи онлайн', 'bad');
+  coopStop(true);
+  const code = String(ri(10000, 99999));
+  NET.coop = {role:'host', code, peer:null, last:0};
+  NET.coop.ch = coopChannel(code, coopHostMsg);
+  if (!NET.coop.ch){ NET.coop = null; return toast('Немає зв’язку з сервером', 'bad'); }
+  NET.coop.iv = setInterval(coopHostTick, 1500);
+  toast(`🤝 Зміну відкрито! Код для друга: ${code}`, 'good'); dirty = true;
+}
+function coopHostMsg(m){
+  const C = NET.coop; if (!C || C.role !== 'host' || m.from !== 'guest') return;
+  if (m.t === 'join'){
+    if (C.peer && C.peer.id !== m.id && Date.now() - C.last < 20000) return coopSend({t:'busy', to:m.id});
+    C.peer = {id:m.id, nick:String(m.nick || 'Друг').slice(0, 24)}; C.last = Date.now(); C.served = C.served || 0;
+    coopSend({t:'hello', to:m.id, nick:G.nick, branch:G.branch});
+    sBell(); toast(`🤝 ${esc(C.peer.nick)} приєднався(лась) до твоєї зміни!`, 'gold'); dirty = true; return;
+  }
+  if (!C.peer || m.id !== C.peer.id) return;
+  C.last = Date.now();
+  if (m.t === 'ping') return;
+  if (m.t === 'bye'){ coopRelease(); toast(`🤝 ${esc(C.peer.nick)} пішов(ла) зі зміни`); C.peer = null; dirty = true; return; }
+  if (m.t === 'take'){
+    const c = G.phase === 'day' && G.queue.find(x => x.id === m.cid && !x.by);
+    if (!c || G.queue.some(x => x.by === 'coop')) return coopSend({t:'nojob', to:m.id});
+    c.by = 'coop'; dirty = true;
+    const job = {cid:c.id, kind:c.kind, name:c.name, av:c.av, card: !!c.card && !manualMode(), hi:String(c.hi || '').replace(/<[^>]+>/g, '')};
+    if (c.kind === 'get'){
+      const ps = G.parcels.filter(p => c.pids.includes(p.id));
+      job.phone = c.phone || (ps[0] && ps[0].phone) || ''; job.parcels = ps.map(p => ({ttn:String(p.ttn), e:p.e, item:p.item, cell:p.cell || 'поштомат', cod:p.cod}));
+      job.cells = cellsList().small.concat(cellsList().big);
+    } else job.items = c.items.filter(it => !it.ban).map(it => ({item:it.item, e:it.e, s:it.s, f:it.f, packed:it.packed || c.biz ? 1 : 0, w:it.w, city:it.city, cod:it.cod || 0, intl:it.intl || null}));
+    return coopSend({t:'job', to:m.id, job});
+  }
+  if (m.t === 'done'){
+    const c = G.queue.find(x => x.id === m.cid && x.by === 'coop'); if (!c) return;
+    const mist = Math.max(0, Math.min(9, m.mist | 0));
+    const money = staffFinish({name:C.peer.nick, lvl:5, traits:[], cl:c.id, t:0, mood:80, fat:0}, mist >= 2) || 0;
+    const pay = Math.round(40 + money * 0.35), xp = 15 + (c.items ? c.items.length : 1) * 5;
+    C.served++; G.stats.coopHosted = (G.stats.coopHosted || 0) + 1;
+    coopSend({t:'pay', to:m.id, cid:c.id, money:pay, xp, mist});
+    toast(`🤝 ${esc(C.peer.nick)} обслужив(ла) ${esc(c.name)}${mist ? ` (помилок: ${mist})` : ' без помилок'} · +${fmt(Math.round(money*0.9))} ₴ відділенню`, mist >= 2 ? 'bad' : 'good');
+    dirty = true;
+  }
+}
+function coopRelease(){ if (G) G.queue.forEach(c => { if (c.by === 'coop') c.by = null; }); dirty = true; }
+function coopHostTick(){
+  const C = NET.coop; if (!C || C.role !== 'host' || !G) return;
+  if (C.peer && Date.now() - C.last > 25000){ coopRelease(); toast(`🤝 ${esc(C.peer.nick)} втратив(ла) зв’язок`, 'bad'); C.peer = null; dirty = true; }
+  if (!C.peer) return;
+  coopSend({t:'st', to:C.peer.id, phase:G.phase, time:Math.round(G.time), day:G.day, branch:G.branch,
+    q: G.queue.filter(c => !c.by).slice(0, 12).map(c => ({id:c.id, kind:c.kind, name:c.name, av:c.av, n: c.kind === 'get' ? c.pids.length : c.items.length, pat: Math.round(clamp(c.pat / c.max, 0, 1) * 100), reg: !!c.reg, biz: !!c.biz}))});
+}
+function coopJoin(){
+  if (!G.pid) return toast('Спершу підключи онлайн', 'bad');
+  const code = (($('#coopcode') || {}).value || '').replace(/\D/g, '');
+  if (code.length !== 5) return toast('Код — 5 цифр', 'bad');
+  coopStop(true);
+  NET.coop = {role:'guest', code, host:null, st:null, job:null, last:Date.now()};
+  NET.coop.ch = coopChannel(code, coopGuestMsg);
+  if (!NET.coop.ch){ NET.coop = null; return toast('Немає зв’язку з сервером', 'bad'); }
+  let tries = 0;
+  NET.coop.jt = setInterval(() => { const C = NET.coop; if (!C || C.host || ++tries > 8){ clearInterval(C && C.jt); if (C && !C.host){ toast('Зміну з таким кодом не знайдено. Перевір код — друг має тримати відкритою вкладку «Онлайн → Кооператив».', 'bad'); coopStop(true); } return; } coopSend({t:'join', id:G.pid, nick:G.nick}); }, 1000);
+  NET.coop.iv = setInterval(() => { const C = NET.coop; if (!C || !C.host) return; coopSend({t:'ping', id:G.pid}); if (Date.now() - C.last > 20000){ toast('🤝 Зв’язок зі зміною друга втрачено', 'bad'); coopStop(true); } }, 5000);
+  dirty = true;
+}
+function coopGuestMsg(m){
+  const C = NET.coop; if (!C || C.role !== 'guest' || m.from !== 'host' || (m.to && m.to !== G.pid)) return;
+  C.last = Date.now();
+  if (m.t === 'busy'){ toast('На цій зміні вже працює інший гравець', 'bad'); coopStop(true); return; }
+  if (m.t === 'hello'){ C.host = {nick:m.nick, branch:m.branch}; clearInterval(C.jt); sBell(); toast(`🤝 Ти на зміні у ${esc(m.nick)}!`, 'gold'); dirty = true; return; }
+  if (m.t === 'st'){ C.st = m; if (TAB === 'online' && NET.sub === 'coop' && !C.job) dirty = true; return; }
+  if (m.t === 'nojob'){ C.waiting = false; toast('Цього клієнта вже обслуговують', 'bad'); dirty = true; return; }
+  if (m.t === 'job'){ C.waiting = false; coopStartJob(m.job); return; }
+  if (m.t === 'pay'){
+    addMoney(m.money); addXp(m.xp); G.stats.coopServed = (G.stats.coopServed || 0) + 1; save();
+    toast(`🤝 Зарплата за допомогу другу: +${fmt(m.money)} ₴, +${m.xp} XP`, 'good'); dirty = true;
+  }
+}
+function coopStop(quiet){
+  const C = NET.coop; if (!C) return;
+  if (C.role === 'guest' && C.host) coopSend({t:'bye', id:G && G.pid});
+  if (C.role === 'host') coopRelease();
+  clearInterval(C.iv); clearInterval(C.jt);
+  try { if (C.ch && NET.sb) NET.sb.removeChannel(C.ch); } catch(e){}
+  NET.coop = null; if (modalIsCoop) closeModal();
+  if (!quiet) toast('🤝 Кооператив завершено');
+  dirty = true;
+}
+// --- обслуговування у гостя (спрощений процес)
+let modalIsCoop = false;
+function coopStartJob(job){
+  const C = NET.coop; if (!C) return;
+  job.t0 = performance.now(); job.mist = 0; job.i = 0;
+  if (job.kind === 'get'){
+    job.step = 'phone';
+    job.rows = shuffle([job.phone, phone(), phone(), phone()]);
+    job.picked = [];
+  } else job.step = 'pack';
+  C.job = job; coopRender();
+}
+function coopMist(msg){ const j = NET.coop.job; j.mist++; sErr(); toast('❌ ' + msg, 'bad'); }
+function coopRender(){
+  const C = NET.coop, j = C && C.job; if (!j){ if (modalIsCoop) closeModal(); return; }
+  let b = `<div class="mute" style="margin-bottom:6px">🤝 Зміна у <b>${esc(C.host ? C.host.nick : '')}</b> · помилок: ${j.mist}</div>`;
+  const say = t => speaker({av:j.av}, t);
+  if (j.kind === 'get'){
+    const left = j.parcels.filter((p,i) => !j.picked.includes(i));
+    if (j.step === 'phone'){
+      b += say(`${esc(j.hi)}<br>Номер: <b style="font-size:17px">${j.phone}</b>`);
+      b += `<div class="terminal">📟 Пошук за номером:<div style="margin-top:6px">${j.rows.map(r => `<div class="trow" data-act="cpphone" data-v="${r}"><span>📞 ${r}</span></div>`).join('')}</div></div>`;
+    } else if (j.step === 'cell'){
+      const p = left[0], pi = j.parcels.indexOf(p);
+      if (!j.cellOpts) j.cellOpts = shuffle([p.cell, ...shuffle((j.cells || []).filter(c => c !== p.cell)).slice(0, 3)]);
+      b += `<div class="terminal">📟 Посилка ${p.e} ${esc(p.item)} · ТТН …${p.ttn.slice(-4)} → комірка <b style="font-size:18px">${p.cell}</b> (${j.picked.length + 1}/${j.parcels.length})</div>
+        <div class="opts">${j.cellOpts.map(c => `<button data-act="cpcell" data-v="${c}" data-i="${pi}">🗄️ ${c}</button>`).join('')}</div>`;
+    } else if (j.step === 'pay'){
+      const sum = j.parcels.reduce((a,p) => a + p.cod, 0);
+      b += say(j.card ? 'Можна карткою?' : 'Я готівкою.');
+      b += `<div class="terminal">Накладений платіж: <b style="font-size:20px">${sum} ₴</b></div><div class="opts"><button data-act="cppay" data-v="card">💳 Термінал</button><button data-act="cppay" data-v="cash">💵 Готівка</button></div>`;
+    } else {
+      b += say('Дякую!') + `<button class="ok" style="width:100%;padding:14px" data-act="cpdone">📦 Видати посилку</button>`;
+    }
+  } else {
+    const it = j.items[j.i];
+    if (j.step === 'pack'){
+      b += say(`${esc(j.i ? 'І ще:' : j.hi)} <b>${esc(it.item.toLowerCase())}</b>${it.f ? ' — крихке!' : ''} (${j.i + 1}/${j.items.length})`);
+      b += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${esc(it.item)}</b><div class="mute">${SIZE_CM[it.s]}</div>${it.packed ? '<div class="mute">🏷️ Вже запаковано</div>' : ''}</div></div>
+        <div class="opts">${PACK.map(p => `<button data-act="cppack" data-v="${p.k}">${p.e} ${p.n}</button>`).join('')}</div>`;
+    } else if (j.step === 'city'){
+      if (!j.cityOpts) j.cityOpts = shuffle([it.city, ...shuffle((it.intl ? COUNTRIES.map(x => x[0]) : CITIES).filter(x => x !== it.city)).slice(0, 3)]);
+      b += say(`Відправляємо в <b>${esc(it.city)}</b>.`) + `<div class="opts">${j.cityOpts.map(x => `<button data-act="cpcity" data-v="${x}">${it.intl ? CFLAG(x) + ' ' : ''}${x}</button>`).join('')}</div>`;
+    } else if (j.step === 'pay'){
+      b += say(j.card ? 'Можна карткою?' : 'Я готівкою.') + `<div class="opts"><button data-act="cppay" data-v="card">💳 Термінал</button><button data-act="cppay" data-v="cash">💵 Готівка</button></div>`;
+    } else b += say('Дякую!') + `<button class="ok" style="width:100%;padding:14px" data-act="cpdone">🖨️ Надрукувати ТТН і прийняти</button>`;
+  }
+  showModal(`🤝 ${j.av} ${esc(j.name)}`, b); modalIsCoop = true;
+  $('#modal .x').classList.add('hidden');
+}
+function coopAct(a, el){
+  const C = NET.coop, j = C && C.job; if (!j) return;
+  const v = el.dataset.v;
+  if (a === 'cpphone'){ if (v !== j.phone) coopMist('Не той номер!'); else { sScan(); j.step = 'cell'; } }
+  else if (a === 'cpcell'){
+    const i = +el.dataset.i, p = j.parcels[i];
+    if (v !== p.cell) coopMist(`Посилка в комірці ${p.cell}!`);
+    else { sScan(); j.picked.push(i); j.cellOpts = null; if (j.picked.length >= j.parcels.length) j.step = j.parcels.some(p => p.cod) ? 'pay' : 'give'; }
+  }
+  else if (a === 'cppay'){ if ((v === 'card') !== j.card) coopMist(j.card ? 'Клієнт хотів карткою' : 'Клієнт дає готівку'); else { sCash(); j.step = j.kind === 'get' ? 'give' : 'print'; } }
+  else if (a === 'cppack'){
+    const it = j.items[j.i], k = +v;
+    if (it.packed || it.s >= 4){ if (k !== 9){ coopMist('Річ уже запакована'); return coopRender(); } }
+    else if (k === 9 || k < it.s){ coopMist(k === 9 ? 'Треба пакування' : 'Не влазить!'); return coopRender(); }
+    sScan(); j.step = 'city';
+  }
+  else if (a === 'cpcity'){
+    const it = j.items[j.i];
+    if (v !== it.city){ coopMist(`Клієнт казав «${it.city}»`); return coopRender(); }
+    sScan(); j.cityOpts = null;
+    if (j.i < j.items.length - 1){ j.i++; j.step = 'pack'; } else j.step = 'pay';
+  }
+  else if (a === 'cpdone'){
+    sPrinter(); coopSend({t:'done', id:G.pid, cid:j.cid, mist:j.mist, secs:Math.round((performance.now() - j.t0)/1000)});
+    C.job = null; modalIsCoop = false; closeModal(); dirty = true; return;
+  }
+  coopRender();
+}
+function coopHTML(){
+  const C = NET.coop;
+  if (!G.pid) return '<div class="card mute">Підключи онлайн, щоб грати з другом.</div>';
+  const intro = `<div class="card"><h3>🤝 Кооператив</h3><div class="mute">Друг заходить на твою зміну зі свого телефона чи комп’ютера і обслуговує твоїх клієнтів у реальному часі. Гроші за клієнтів отримує твоє відділення, а друг — зарплату й досвід у свою гру. Найзручніше: господар грає день, а гість — у себе вночі.</div></div>`;
+  if (!C) return intro + `<div class="grid2"><div class="card"><h3>🏤 Відкрити свою зміну</h3><div class="mute">Отримаєш код — передай його другу.</div><button class="pri" style="margin-top:8px;width:100%" data-act="coophost">🔓 Відкрити зміну для друга</button></div>
+    <div class="card"><h3>🙋 Піти на зміну до друга</h3><input id="coopcode" inputmode="numeric" maxlength="5" placeholder="Код з 5 цифр"><button class="ok" style="margin-top:8px;width:100%" data-act="coopjoin">Приєднатись</button></div></div>`;
+  if (C.role === 'host'){
+    return intro + `<div class="card"><h3>🔓 Твоя зміна відкрита</h3><div class="mute">Код для друга:</div><div style="font-size:38px;font-weight:800;letter-spacing:6px;margin:4px 0">${C.code}</div>
+      ${C.peer ? `<div>🟢 Працює: <b>${esc(C.peer.nick)}</b> · обслужив(ла): ${C.served || 0}</div>` : '<div class="mute">⏳ Чекаємо на друга… Тримай гру відкритою.</div>'}
+      ${G.phase !== 'day' ? '<div class="banner ev" style="margin-top:6px">🔑 Відкрий відділення (почни день), щоб другу було кого обслуговувати.</div>' : ''}
+      <button class="ghost" style="margin-top:8px" data-act="coopstop">Закрити зміну</button></div>`;
+  }
+  const st = C.st;
+  if (!C.host) return intro + `<div class="card"><div class="mute">⏳ Підключаємось до зміни ${C.code}…</div><button class="ghost sm" style="margin-top:6px" data-act="coopstop">Скасувати</button></div>`;
+  return intro + `<div class="card"><h3>🙋 Ти на зміні у ${esc(C.host.nick)}</h3><div class="mute">${esc(C.host.branch || '')}${st ? ` · день ${st.day} · ${st.phase === 'day' ? '🕐 ' + hhmm(st.time) : '🌙 зачинено'}` : ''}</div>
+    ${!st || st.phase !== 'day' ? '<div class="mute" style="margin-top:8px">Відділення друга зараз зачинене. Чекаємо, поки він відкриє день…</div>' : !st.q.length ? '<div class="mute" style="margin-top:8px">Черга порожня ☕</div>' :
+    `<div class="queue" style="margin-top:8px">${st.q.map(c => `<div class="client ${c.reg?'reg':''}" data-act="cooptake" data-id="${c.id}"><div class="av">${c.av}</div><div class="nm">${esc(c.name)}</div><div class="kd">${c.kind === 'get' ? '📥 отримати' : c.biz ? '🤝 партія' : '📤 відправити'}${c.n > 1 ? ' ×' + c.n : ''}</div><div class="pat"><i style="width:${c.pat}%;background:${c.pat > 50 ? 'var(--green)' : c.pat > 25 ? 'var(--amber)' : 'var(--red)'}"></i></div></div>`).join('')}</div>
+      <div class="mute">Натисни на клієнта, щоб обслужити.</div>`}
+    ${C.job ? '<button class="pri" style="margin-top:8px" data-act="coopreopen">Продовжити обслуговування</button>' : ''}
+    <button class="ghost" style="margin-top:8px" data-act="coopstop">Піти зі зміни</button></div>`;
+}
 
 /* ---------- оновлення гри ---------- */
 async function checkVersion(){

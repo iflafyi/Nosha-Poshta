@@ -27,3 +27,4 @@ create table if not exists public.np_admins (id uuid primary key);
 --   np_announce_recent(after), np_global_get(),
 --   адмін (перевіряють np_admins через np_is_admin): np_admin_announce, np_admin_ann_off, np_admin_global(k,v,hours),
 --   np_admin_gift(to|null=всім, 'dev:money:N'|'dev:xp:N', note), np_admin_stats, np_admin_chat_del(msg)
+-- v5 (2026-11-01): тижневі категорії — див. sql/week_cats.sql
