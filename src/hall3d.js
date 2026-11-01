@@ -452,6 +452,51 @@ function buildExtras(){
   // генератор на вулиці
   E.gen = grp(8.6, 0, -3.6);
   blk(0.8, 0.55, 0.5, 0xf39c12, 0, 0, 0, E.gen); blk(0.6, 0.05, 0.3, 0x333333, 0, 0.55, 0, E.gen);
+  const spr = (e, sz, x, y, z, g) => { const sp = emojiSprite(e, sz); sp.position.set(x, y, z); g.add(sp); return sp; };
+  // електронна черга: термінал талонів біля входу + табло над стійкою
+  E.equeue = grp(5.7, 0, 0.35);
+  blk(0.4, 1.15, 0.34, 0x1f3a5f, 0, 0, 0, E.equeue); blk(0.3, 0.06, 0.2, 0xffffff, 0, 1.15, 0, E.equeue); spr('🎫', 0.32, 0, 1.55, 0, E.equeue);
+  R.qCv = document.createElement('canvas'); R.qCv.width = 512; R.qCv.height = 128;
+  R.qTex = new CanvasTexture(R.qCv); R.qTex.colorSpace = SRGBColorSpace;
+  E.qBoard = new Mesh(new PlaneGeometry(1.7, 0.42), new MeshBasicMaterial({map: R.qTex})); E.qBoard.position.set(-1.0, 2.5, -0.55); S.add(E.qBoard); E.qBoard.visible = false;
+  R.qFrame = blk(1.76, 0.48, 0.06, 0x222222, -1.0, 2.26, -0.6); R.qFrame.visible = false;
+  // термінал самообслуговування
+  E.kiosk = grp(4.75, 0, 3.95);
+  blk(0.55, 1.25, 0.4, 0xecf0f1, 0, 0, 0, E.kiosk); blk(0.45, 0.34, 0.04, 0x2c3e50, 0, 0.85, -0.21, E.kiosk); blk(0.57, 0.12, 0.42, 0xd7262b, 0, 1.25, 0, E.kiosk);
+  spr('🖥️', 0.34, 0, 1.7, 0, E.kiosk);
+  // Wi-Fi роутер на стіні
+  E.wifi = grp(-6.9, 2.15, -3.4);
+  blk(0.1, 0.1, 0.32, 0xffffff, 0, 0, 0, E.wifi); spr('📶', 0.26, 0.1, 0.35, 0, E.wifi);
+  // пандус біля входу
+  E.access = grp(7.75, 0, 1.5);
+  { const rp = blk(0.95, 0.07, 1.3, 0xf1c40f, 0, 0, 0, E.access); rp.rotation.z = -0.06; }
+  for (const z of [-0.66, 0.66]){ blk(0.95, 0.04, 0.04, 0x7f8c8d, 0, 0.85, z, E.access); for (const x of [-0.45, 0.45]) blk(0.04, 0.85, 0.04, 0x7f8c8d, x, 0, z, E.access); }
+  spr('♿', 0.3, 0.5, 1.3, -0.9, E.access);
+  // камери
+  E.cams = grp(0, 0, 0);
+  for (const [x, z] of [[-6.75, 4.25], [6.6, -4.3], [6.6, 4.25]]){
+    mesh(new SphereGeometry(0.1, 10, 8), lam(0x2c3e50), x, 2.62, z, E.cams); blk(0.03, 0.03, 0.03, 0xff3333, x, 2.55, z + (z > 0 ? -0.09 : 0.09), E.cams);
+  }
+  // купюролічильник на стійці
+  E.counter = grp(WX(1) - 0.75, 1.03, -1.65);
+  blk(0.26, 0.14, 0.22, 0x34495e, 0, 0, 0, E.counter); blk(0.18, 0.02, 0.1, 0x2ecc71, 0, 0.14, 0, E.counter); spr('💶', 0.2, 0, 0.38, 0, E.counter);
+  // сонячні панелі і Starlink на вулиці
+  E.solar = grp(9.25, 0, -1.9);
+  blk(0.06, 0.9, 0.06, 0x7f8c8d, 0, 0, 0, E.solar);
+  { const pn = blk(0.9, 0.04, 1.3, 0x1a3c6e, 0, 0.9, 0, E.solar); pn.rotation.z = 0.55; const gl = blk(0.86, 0.01, 1.26, 0x5dade2, 0.01, 0.93, 0, E.solar); gl.rotation.z = 0.55; }
+  spr('☀️', 0.32, 0, 1.75, 0, E.solar);
+  E.starlink = grp(9.35, 0, -4.7);
+  blk(0.05, 1.4, 0.05, 0x888888, 0, 0, 0, E.starlink);
+  { const d = mesh(new CylinderGeometry(0.28, 0.28, 0.04, 18), lam(0xffffff), 0, 1.45, 0, E.starlink); d.rotation.z = 0.5; }
+  // транспорт кур'єра
+  E.cveh = grp(8.4, 0, 4.35);
+  E.cvehSp = spr('🚲', 0.95, 0, 0.5, 0, E.cveh);
+  // кімната відпочинку: диван на кухні
+  E.lounge = grp(-6.62, 0, -8.45);
+  blk(0.6, 0.42, 1.05, 0x8e44ad, 0, 0, 0, E.lounge); blk(0.16, 0.5, 1.05, 0x7d3c98, -0.24, 0.42, 0, E.lounge);
+  for (const z of [-0.5, 0.5]) blk(0.6, 0.22, 0.1, 0x7d3c98, 0, 0.42, z, E.lounge);
+  E.lounge2 = grp(-5.0, 0, -7.85);
+  spr('📺', 0.45, 0, 1.7, 0, E.lounge2); spr('🪴', 0.4, 0.9, 0.3, 0, E.lounge2);
 
   // декор
   const D = R.decor = {};
@@ -598,7 +643,7 @@ function lineSpot(k){
   return [-0.6 + j * 0.8, 3.1 + (row - 2) * 0.8];
 }
 function faceAlong(a, b){ return Math.atan2(b[0] - a[0], b[1] - a[1]); }
-function frontStaff(G){ return (G.staff || []).filter(s => (s.role === 'issue' || s.role === 'accept') && !s.training && !s.away && !s.brk).slice(0, Math.max(0, (G.up.windows || 1) - 1)); }
+function frontStaff(G){ return (G.staff || []).filter(s => (s.role === 'issue' || s.role === 'accept') && (!s.training || (G.up.school || 0) >= 2) && !s.away && !s.brk).slice(0, Math.max(0, (G.up.windows || 1) - 1)); }
 
 /* ---------- синхронізація зі станом гри ---------- */
 function sync(){
@@ -636,7 +681,7 @@ function sync(){
     want.set(`op${k}:${st.id}:${st.av}` + (k === 0 ? `:${L.c || ''}:${L.hat || ''}:${L.badge !== false ? 1 : 0}` : ''), {kind: 'op', w: k, st});
   }
   // складські працівники
-  (G.staff || []).filter(s => s.role === 'store' && !s.training && !s.away).slice(0, 4).forEach(s => want.set(`st${s.id}:${s.av}`, {kind: 'store', st: s}));
+  (G.staff || []).filter(s => s.role === 'store' && (!s.training || (G.up.school || 0) >= 2) && !s.away).slice(0, 4).forEach(s => want.set(`st${s.id}:${s.av}`, {kind: 'store', st: s}));
   // інспектор
   if (G.insp && G.insp.state === 'on') want.set('insp', {kind: 'insp'});
   // клієнти
@@ -723,8 +768,24 @@ function syncSlow(G, br){
   R.ext5.visible = sp >= 1; R.barFull.visible = sp < 1; R.barShort.visible = sp >= 1;
   E.coffee.position.set(sp >= 1 ? 1.3 : 3.55, 0, sp >= 1 ? 4.1 : -1.2);
   E.coffee.visible = !!U.coffee; E.ac.visible = !!U.ac && R.mode === 'hall'; E.gen.visible = !!U.gen; E.ads.visible = !!U.ads;
+  E.equeue.visible = E.qBoard.visible = R.qFrame.visible = !!U.equeue;
+  if (U.equeue){
+    const num = Math.max(1, (G.cid || 1) - 1 - (G.queue || []).length) % 1000, win = 1 + num % Math.max(1, U.windows || 1);
+    const key = num + ':' + win;
+    if (R._qk !== key){
+      R._qk = key; const c = R.qCv.getContext('2d');
+      c.fillStyle = '#111'; c.fillRect(0, 0, 512, 128); c.fillStyle = '#ff4d3d'; c.font = 'bold 70px monospace'; c.textBaseline = 'middle';
+      c.fillText('№' + String(num).padStart(3, '0'), 22, 66); c.fillStyle = '#7dff8a'; c.fillText('→ ' + win, 330, 66);
+      R.qTex.needsUpdate = true;
+    }
+  }
+  E.kiosk.visible = !!U.kiosk; E.wifi.visible = !!U.wifi && R.mode === 'hall'; E.access.visible = !!U.access; E.cams.visible = !!U.cams;
+  E.counter.visible = !!U.counter; E.solar.visible = !!U.solar; E.starlink.visible = !!U.starlink;
+  E.lounge.visible = (U.lounge || 0) >= 1; E.lounge2.visible = (U.lounge || 0) >= 2;
+  const cv = U.cveh || 0, courHome = (G.staff || []).some(s => s.role === 'courier' && !s.route && !s.away);
+  E.cveh.visible = cv > 0 && courHome; if (cv) setEmoji(E.cvehSp, ['', '🚲', '🛵', '🚐'][cv] || '🚐');
   E.locker.visible = !!U.locker;
-  if (U.locker){ const w = 0.6 + U.locker * 0.4; E.lockerBody.scale.z = w; E.lockerGrid.scale.x = w * 0.85; E.locker.position.z = 2.4 + w / 2; }
+  if (U.locker){ const w = 0.6 + Math.min(3, U.locker) * 0.4; E.lockerBody.scale.z = w; E.lockerGrid.scale.x = w * 0.85; E.locker.position.z = 2.4 + w / 2; }
   R.scanner.visible = !!U.scanner;
   E.balloons.visible = !!(br.ev() || G.eve);
   const tier = U.tier || 0;
@@ -736,7 +797,7 @@ function syncSlow(G, br){
   const wet = !!W.wet, snow = G.weather === 'snow';
   R.precip.visible = wet; R.precip.material.color.set(snow ? 0xffffff : 0xaed6f1); R.precip.material.size = snow ? 0.09 : 0.05; R._snow = snow;
   R.street.material.color.set(snow ? 0xe8eef2 : wet ? 0x6f7275 : 0x9a9a96);
-  R.manual = br.manual(); R.gen = !!(G.outage && G.outage.on && U.gen);
+  R.manual = br.manual(); R.gen = !!(G.outage && G.outage.on && U.gen && !U.solar);
   R.time = G.time || 480;
 }
 

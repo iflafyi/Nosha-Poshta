@@ -204,6 +204,9 @@ main{padding:4px 10px}
 .badge2{background:var(--amber2);border:1px solid var(--amber);border-radius:10px;padding:3px 8px;font-size:13px}
 .banner{background:#fff;border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:14px}
 .banner.ev{border-left-color:var(--amber);background:var(--amber2)}.banner.insp{border-left-color:var(--red);background:var(--red3)}.banner.dark{border-left-color:#000;background:#2b2b2b;color:#eee}
+.upchips{gap:6px;margin:8px 0;flex-wrap:wrap}.upchips small{opacity:.65}.upchips button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bill{display:flex;align-items:center;gap:8px;background:#e8f5e9;border:2px dashed #66bb6a;border-radius:10px;padding:8px 12px;margin:6px 0;font-size:18px}
+.bill i{font-size:12px;color:var(--mute,#777);font-style:italic}.bill.bad{background:#fdecea;border-color:var(--red,#d7262b)}
 #dark{position:fixed;inset:0;pointer-events:none;z-index:55;background:radial-gradient(circle 190px at var(--fx,50%) var(--fy,45%),transparent 0,transparent 55%,rgba(5,5,15,.8) 100%)}
 
 /* сканер штрихкодів */
@@ -260,7 +263,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011905; // ставиться build.py
+const GAME_BUILD = 202611012032; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -370,14 +373,39 @@ const UPS = {
   scanner:{n:'Сканер', e:'📟', start:0, costs:[1000,3500], need:[2,5], d:l=>['Звичайний пошук','Підсвічує потрібну комірку','Термінал сам знаходить номер телефону'][l]},
   chairs:{n:'Зона очікування', e:'🪑', start:0, costs:[600,1800,4000], need:[1,3,6], d:l=>`Терпіння клієнтів +${l*20}%, черга до ${queueMax(l)} осіб.`},
   cart:{n:'Рокла', e:'🛒', start:0, costs:[1200], need:[3], d:l=>l?'Великі посилки вивантажуються за 1 клік, склад працює на 30% швидше.':'Великі посилки треба тягати в кілька кліків.'},
-  coffee:{n:'Кавоапарат', e:'☕', start:0, costs:[2500], need:[4], d:l=>l?'Чайові +25%, терпіння +10%.':'Кава для клієнтів: більше чайових і терпіння.'},
-  ac:{n:'Кондиціонер', e:'❄️', start:0, costs:[3000], need:[5], d:l=>l?'Клієнти ставлять оцінку на 0,3 вищу.':'Прохолода у залі покращує оцінки.'},
+  coffee:{n:'Кавоапарат', e:'☕', start:0, costs:[2500,5000], need:[4,8], d:l=>['Кава для клієнтів: більше чайових і терпіння.','Чайові +25%, терпіння +10%.','☕🥐 Кава + снеки: чайові +45%, терпіння +20%, персонал веселіший.'][l]},
+  ac:{n:'Кондиціонер', e:'❄️', start:0, costs:[3000,6000], need:[5,9], d:l=>['Прохолода у залі покращує оцінки.','Клієнти ставлять оцінку на 0,3 вищу.','Кліматична система: оцінки +0,5, персонал втомлюється на 10% менше.'][l]},
   ads:{n:'Вивіска і реклама', e:'📣', start:0, costs:[1000,3000,7000], need:[2,5,9], d:l=>`Клієнтів більше на ${l*15}%.`},
-  locker:{n:'Поштомат', e:'🟥', start:0, costs:[5000,9000,15000], need:[6,8,10], d:l=>l?`${lockerCap(l)} комірок біля входу. Завантаж туди малі посилки на «Складі» — клієнти заберуть самі, без черги (+12 ₴ за кожну).`:'Поштомат біля входу: клієнти забирають посилки самі, без черги.'},
+  locker:{n:'Поштомат', e:'🟥', start:0, costs:[5000,9000,15000,22000], need:[6,8,10,12], d:l=>l?`${lockerCap(l)} комірок біля входу.${l >= 4 ? ' 🌙 Вуличний 24/7 — посилки забирають і вночі.' : ''} Завантаж туди малі посилки на «Складі» — клієнти заберуть самі, без черги (+12 ₴ за кожну).`:'Поштомат біля входу: клієнти забирають посилки самі, без черги.'},
   gen:{n:'Генератор', e:'🔌', start:0, costs:[3500], need:[3], d:l=>l?'Під час відключень світла все працює (пальне 100 ₴ за відключення).':'Без нього при відключенні світла — ручний режим з ліхтариком.'},
   space:{n:'Розширення приміщення', e:'🏗️', start:0, costs:[8000,20000], need:[6,11], d:l=>['Стандартне приміщення: до 4 віконець.','Добудований склад: +16 малих і +4 габаритні комірки, місце для 5-го віконця.','Друга зала очікування: черга +6, ще 6 крісел, терпіння клієнтів +10%.'][l]},
   tier:{n:'Розширення відділення', e:'🏢', start:0, costs:[6000,15000,35000], need:[5,10,15], d:l=>`${TIERS[l]}: клієнтів +${l*35}%, більші машини, до ${staffMax(l)} працівників.`},
+  equeue:{n:'Електронна черга', e:'🎫', start:0, costs:[2500,6000], need:[3,7], d:l=>['Звичайна жива черга — всі стоять і нервують.','Табло й талони: терпіння в черзі тратиться на 15% повільніше.','Табло + SMS «ваша черга скоро»: терпіння тратиться на 30% повільніше, у черзі +2 місця.'][l]},
+  wifi:{n:'Wi‑Fi і зарядка', e:'📶', start:0, costs:[1200], need:[2], d:l=>l?'Клієнти заряджають телефон і показують код з SMS, терпіння +5%.':'Клієнти часто приходять з розрядженим телефоном і без коду з SMS.'},
+  access:{n:'Пандус і кнопка виклику', e:'♿', start:0, costs:[1500], need:[3], d:l=>l?'Постійні клієнти терплячіші (+15%) і швидше набирають ❤️.':'Літнім постійним клієнтам важко заходити у відділення.'},
+  kiosk:{n:'Термінал самообслуговування', e:'🖥️', start:0, costs:[4500,9000], need:[5,8], d:l=>['Усі відправлення оформлюєш ти.','30% відправників оформлюють ТТН самі: місто, вартість і оплата карткою — вже в терміналі. Тобі тільки запакувати й зважити.','Уже 50% відправників оформлюються через термінал.'][l]},
+  printer:{n:'Термопринтер Pro', e:'🖨️', start:0, costs:[2000,5000], need:[3,6], d:l=>['Звичайний принтер: іноді жує етикетки.','Жує етикетки в 4 рази рідше.','Ніколи не жує, а в рулоні 130 етикеток замість 100.'][l]},
+  battery:{n:'Батарея сканера', e:'🔋', start:0, costs:[900,2500], need:[2,5], d:l=>['Одна батарея, заряд 25 хв.','Ємніша батарея: сідає вдвічі повільніше, заряджається за 10 хв.','Док-станція: розряджену батарею міняє сама — сканер ніколи не гальмує.'][l]},
+  counter:{n:'Купюролічильник і детектор', e:'💶', start:0, costs:[3000], need:[4], d:l=>l?'Підказує решту і сам ловить фальшиві купюри — і в тебе, і в персоналу.':'Фальшиві купюри (з 3 рівня) доведеться перевіряти самому на світло.'},
+  dimscan:{n:'Автоваги з 3D-сканером', e:'📏', start:0, costs:[4000], need:[5], d:l=>l?'Зважування і об’ємна вага негабариту рахуються самі — кроки пропускаються.':'Кожну посилку ставиш на ваги, а негабарит міряєш рулеткою.'},
+  packdesk:{n:'Стіл пакувальника', e:'📦', start:0, costs:[1800,4000], need:[3,6], d:l=>['Пакуєш на краю стійки.','Плівка для крихкого підставляється сама.','Плівка + одразу підбирається потрібна коробка.'][l]},
+  sorter:{n:'Сортувальна стрічка', e:'🎢', start:0, costs:[7000,14000], need:[7,10], d:l=>['Посилки з купи розкладаєш ти або склад.','Стрічка сама розкладає посилки з купи по комірках (1 за 3 хв).','Швидша стрічка (1 за 1,5 хв) ще й відсіює пересорт.'][l]},
+  cams:{n:'Відеоспостереження', e:'📹', start:0, costs:[3500], need:[4], d:l=>l?'«Втрачену» посилку видно на камері, менше нестач на інвентаризації, персонал частіше ловить шахраїв, +100 ₴ до премії на перевірці.':'Без камер шукати загублене й ловити шахраїв важче.'},
+  ramp2:{n:'Друга рампа', e:'🚛', start:0, costs:[10000], need:[9], d:l=>l?'Машини стоять на годину довше, привозять на 15% більше посилок, а в свята й сезонні піки приходить додаткова машина.':'Одна рампа — машина чекає недовго.'},
+  lounge:{n:'Кімната відпочинку', e:'🛋️', start:0, costs:[3000,7000], need:[4,8], d:l=>['Персонал відпочиває на кухні на табуретках.','Диван і телевізор: втома −20%, рідше хворіють, на обіді відпочивають швидше.','Повноцінна зона відпочинку: втома −35%, хворіють удвічі рідше, настрій вищий.'][l]},
+  school:{n:'Навчальний клас', e:'🎓', start:0, costs:[4000,9000], need:[5,9], d:l=>['Навчання: 400 ₴ × рівень, працівник пропускає день.','Навчання на 30% дешевше.','Навчання на 50% дешевше і без відриву від роботи.'][l]},
+  cveh:{n:'Транспорт кур’єра', e:'🛵', start:0, costs:[1500,5000,12000], need:[4,7,11], d:l=>['Кур’єр ходить пішки.','🚲 Велосипед: +2 посилки за рейс, на 15% швидше.','🛵 Скутер: +4 посилки, на 30% швидше.','🚐 Авто: +6 посилок, на 45% швидше, рідше «нікого нема вдома».'][l]},
+  app:{n:'Застосунок відділення', e:'📱', start:0, costs:[3000,7000], need:[4,8], d:l=>['Клієнти дзвонять і приходять питати про посилки.','Удвічі менше «Де моя посилка?», 60% клієнтів показують код у застосунку.','Ще менше питань, нагадування — посилки зберігаються 7 днів замість 5.'][l]},
+  solar:{n:'Сонячні панелі', e:'☀️', start:0, costs:[9000], need:[7], d:l=>l?'При відключенні світла все працює без пального, а в сонячний день +60 ₴ за продаж енергії.':'Панелі на даху + акумулятори.'},
+  starlink:{n:'Starlink', e:'🛰️', start:0, costs:[4000], need:[5], d:l=>l?'Без генератора при відключенні працюють термінал, сканер і оплата карткою (тільки темно).':'Супутниковий інтернет на випадок відключень.'},
 };
+const UP_CAT = {windows:'desk', scanner:'desk', printer:'desk', battery:'desk', counter:'desk', dimscan:'desk', packdesk:'desk', kiosk:'desk',
+  chairs:'hall', coffee:'hall', ac:'hall', ads:'hall', equeue:'hall', wifi:'hall', access:'hall', locker:'hall',
+  shelves:'store', cart:'store', sorter:'store', cams:'store', ramp2:'store',
+  lounge:'staff', school:'staff', cveh:'staff',
+  gen:'power', solar:'power', starlink:'power', app:'big', space:'big', tier:'big'};
+const UP_CATS = {all:'Усі', can:'💰 Можна купити', hall:'🪑 Зал', desk:'🪟 Віконце', store:'📦 Склад', staff:'👥 Персонал', power:'⚡ Світло і зв’язок', big:'🏢 Відділення', decor:'🎨 Оформлення'};
+let UPCAT = 'all';
 const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', courier:'🛵 Кур’єр', rest:'😴 Вихідний'};
 /* ---------- мій оператор ---------- */
 const LOOK_E = ['🧑‍💼','👨‍💼','👩‍💼','👨','👩','🧔','👱‍♂️','👱‍♀️','👨‍🦰','👩‍🦰','👨‍🦱','👩‍🦱','🧑‍🦲','👩‍🦳','👴','👵','🧕','🧑‍🦱'];
@@ -408,7 +436,7 @@ const LUNCH = [720, 750, 780, 810, 840];
 // чи немає працівника на роботі сьогодні (вихідний за графіком, лікарняний, прогул)
 function offToday(s){ return (s.off || []).includes(wd()) || (s.sick || 0) >= G.day || s.absent === G.day; }
 function onBreak(s){ return G.phase === 'day' && G.time >= (s.lunch || 780) && G.time < (s.lunch || 780) + 30; }
-const courierCap = s => 4 + s.lvl*2;
+const courierCap = s => 4 + s.lvl*2 + (G.up.cveh || 0)*2;
 const ADDR_ST = ['Шевченка','Франка','Лесі Українки','Грушевського','Садова','Лісова','Миру','Соборна','Зелена','Січових Стрільців','Космонавтів','Набережна'];
 const PACK = [
   {k:0, n:'Конверт', e:'✉️', price:10},
@@ -626,7 +654,7 @@ function newGame(nick, branch){
   return {v:1, nick, branch, pid:null, secret:null, day:1, time:480, phase:'night', money:1000, xp:0, level:1, rating:3.5,
     stats:{issued:0, sent:0, unloaded:0, placed:0, earned:0, clients:0},
     parcels:[], nid:1, queue:[], cid:1, truck:null, trucksDone:{}, hand:null,
-    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0, space:0},
+    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0, space:0, equeue:0, wifi:0, access:0, kiosk:0, printer:0, battery:0, counter:0, dimscan:0, packdesk:0, sorter:0, cams:0, ramp2:0, lounge:0, school:0, cveh:0, app:0, solar:0, starlink:0},
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
     season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null, district:null, streak:null, month:null, expect:[],
@@ -637,6 +665,7 @@ function migrate(g){
   const d = newGame(g.nick || 'Оператор', g.branch || 'Відділення №1');
   for (const k in d) if (g[k] === undefined) g[k] = d[k];
   for (const k in d.up) if (g.up[k] === undefined) g.up[k] = d.up[k];
+  (g.others || []).forEach(o => { if (o.up) for (const k in d.up) if (o.up[k] === undefined) o.up[k] = d.up[k]; });
   for (const k in d.stats) if (g.stats[k] === undefined) g.stats[k] = d.stats[k];
   for (const k in d.today) if (g.today[k] === undefined) g.today[k] = d.today[k];
   for (const k in d.settings) if (g.settings[k] === undefined) g.settings[k] = d.settings[k];
@@ -649,16 +678,21 @@ function migrate(g){
 /* ---------- формули ---------- */
 const smallCount = (l=G.up.shelves) => 8 + l*8 + (G && G.up.space >= 1 ? 16 : 0);
 const bigCount = (l=G.up.shelves) => 2 + l*2 + (G && G.up.space >= 1 ? 4 : 0);
-const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0) + (G && G.up.space >= 2 ? 6 : 0);
+const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0) + (G && G.up.space >= 2 ? 6 : 0) + (G && G.up.equeue >= 2 ? 2 : 0);
 const staffMax = (l=G.up.tier) => 2 + l*2;
 const needXp = l => Math.round(120*Math.pow(l,1.5));
-const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1) * (1 + decorPat()) * (G.up.space >= 2 ? 1.1 : 1);
-const satBonus = () => (G.up.ac ? 0.3 : 0) + decorSat();
-const tipMul = () => (G.up.coffee ? 1.25 : 1) + decorTip();
+const patMul = () => (1 + G.up.chairs*0.2) * (1 + G.up.coffee*0.1) * (1 + decorPat()) * (G.up.space >= 2 ? 1.1 : 1) * (G.up.wifi ? 1.05 : 1);
+const qDecay = () => [1, 0.85, 0.7][G.up.equeue || 0];
+const satBonus = () => [0, 0.3, 0.5][G.up.ac || 0] + decorSat();
+const tipMul = () => [1, 1.25, 1.45][G.up.coffee || 0] + decorTip();
 const serveT = s => (16 - s.lvl*2) * staffMul(s);            // сек на клієнта
 const storeIv = s => (4 - s.lvl*0.5) * (G.up.cart ? 0.7 : 1) * staffMul(s);
 const errCh = s => (0.12 - s.lvl*0.02) * (hasT(s,'careful') ? 0.5 : 1) * (1 + (s.fat||0)/100) * ((s.mood ?? 80) < 30 ? 1.4 : 1);
-const trainCost = s => 400*s.lvl;
+const trainCost = s => Math.round(400*s.lvl*[1, 0.7, 0.5][(G && G.up.school) || 0]/10)*10;
+const rollN = () => G && G.up.printer >= 2 ? 130 : ROLL;
+const powerOn = () => !!(G.up.gen || G.up.solar);
+// темно (відключення без генератора/панелей); manualMode — ще й без зв'язку (Starlink рятує термінал)
+function darkMode(){ return !!(G && G.outage && G.outage.on && !powerOn()); }
 const sendPrice = (w, f) => 60 + Math.round(15*w) + (f ? 20 : 0);
 const smallCell = s => s <= 2;
 const valFee = v => v ? Math.max(5, Math.round(v*0.005)) : 0;   // страховка за оголошену вартість
@@ -674,7 +708,7 @@ const TRACK = {
   other:{a:'📍 Посилка прийшла в інше відділення', ok:'Ой, то я сам(а) не те відділення вказав(ла)! Дякую, піду туди.'},
   lost:{a:'🔍 Оформити заявку на розшук', ok:'Дякую, сподіваюсь, знайдеться! Чекатиму дзвінка.'},
 };
-const lockerCap = (l=G.up.locker) => [0,12,20,30][l] || 0;
+const lockerCap = (l=G.up.locker) => [0,12,20,30,40][l] || 0;
 const lockerN = () => G.parcels.filter(p => p.state === 'locker').length;
 function lockerLoadOne(){
   if (!G.up.locker || lockerN() >= lockerCap()) return false;
@@ -843,7 +877,7 @@ function scanStart(el){
   SCAN.t = setTimeout(() => {
     const e = SCAN.el; scanStop(); if (!e || !e.isConnected) return;
     e.classList.add('scanned'); sScan(); SCAN.last = performance.now();
-    if (G && G.phase === 'day' && !manualMode() && G.sup.bat > 0){ G.sup.bat -= 0.6; if (G.sup.bat <= 0){ G.sup.bat = 0; toast('🪫 Сканер розрядився — номери вводиш вручну. Постав його на зарядку в 🧰', 'bad'); } else if (G.sup.bat < 15 && !G.sup.lowBat){ G.sup.lowBat = 1; toast('🔋 Сканер майже розряджений!'); } }
+    if (G && G.phase === 'day' && !manualMode() && G.sup.bat > 0){ G.sup.bat -= G.up.battery ? 0.3 : 0.6; if (G.sup.bat <= 0 && G.up.battery >= 2){ G.sup.bat = 100; toast('🔋 Док-станція: розряджену батарею замінено на заряджену'); } else if (G.sup.bat <= 0){ G.sup.bat = 0; toast('🪫 Сканер розрядився — номери вводиш вручну. Постав його на зарядку в 🧰', 'bad'); } else if (G.sup.bat < 15 && !G.sup.lowBat){ G.sup.lowBat = 1; toast('🔋 Сканер майже розряджений!'); } }
     act(e.dataset.scan, e);
   }, ms);
 }
@@ -883,7 +917,7 @@ function makeParcel(opts={}){
   return p;
 }
 function truckArrive(kind){
-  const leave = {m:600, x:720, d:870, e:1185}[kind];
+  const leave = {m:600, x:720, d:870, e:1185}[kind] + (G.up.ramp2 && kind !== 'e' ? 60 : 0);
   if (kind === 'e'){
     G.truck = {kind:'out', leaveAt:leave, key:kind};
     sBell(); toast('🚚 Приїхала вечірня машина — завантаж відправлення!', 'gold');
@@ -893,6 +927,7 @@ function truckArrive(kind){
     if (kind === 'x') n = Math.max(4, Math.round(n*0.7));
     const ev = curEvent(); if (ev) n = Math.round(n*ev.truck);
     const se = curSeason(); if (se) n = Math.round(n*se.truck);
+    if (G.up.ramp2) n = Math.round(n*1.15);
     const ids = [];
     // посилки постійним клієнтам
     for (const r of REGS) if (r.kind === 'get' && G.level >= r.lvl && Math.random() < 0.4){
@@ -962,7 +997,7 @@ function spawnClient(force){
     G.queue.push(c); G.stats.clients++; dirty = true; return;
   }
   // «Де моя посилка?»
-  if (G.level >= 2 && !G.queue.some(c => c.kind === 'info') && Math.random() < 0.08){
+  if (G.level >= 2 && !G.queue.some(c => c.kind === 'info') && Math.random() < 0.08 * [1, 0.5, 0.25][G.up.app || 0]){
     const pp = person(), st = pick(['road','road','delay','other','lost']);
     const c = {id:G.cid++, kind:'info', name:pp.name, av:pp.av, reg:null, by:null, pids:[], items:[], card:true,
       track:{st, ttn:ttn(), from:pick(CITIES), hub:pick(['Київ','Львів','Дніпро','Одеса','Харків']), br:ri(2, 99), days:ri(6, 12), item:pickItem().n},
@@ -988,7 +1023,7 @@ function spawnClient(force){
   const kind = reg ? reg.kind : (plain.length && Math.random() < (curDist() ? curDist().get : 0.62) ? 'get' : 'send');
   const pp = reg ? {name:reg.n, av:reg.av} : person();
   const c = {id:G.cid++, kind, name:pp.name, av:pp.av, reg: reg ? reg.id : null, by:null, pids:[], items:[]};
-  const regMul = reg ? reg.pat : 1;
+  const regMul = reg ? reg.pat * (G.up.access ? 1.15 : 1) : 1;
   c.max = c.pat = rnd(45, 65) * patMul() * regMul * (curSeason() ? curSeason().pat : 1);
   c.card = reg && reg.card ? true : Math.random() < (curDist() ? curDist().card : 0.5);
   if (curDist()) c.max = c.pat = c.pat * curDist().pat;
@@ -999,11 +1034,13 @@ function spawnClient(force){
     c.phone = p0.phone; c.pids = group.map(p => p.id);
     group.forEach(p => p.res = c.id);
     c.hi = reg ? reg.hi : p0.back ? 'Я вчора питав(ла), де моя посилка, — а сьогодні прийшла SMS! 😊' : pick(GET_HI);
-    c.app = Math.random() < 0.4;
+    c.app = Math.random() < (G.up.app ? 0.6 : 0.4);
     if (!reg) specialGet(c, p0, group);
     else if (Math.random() < 0.06) p0.lost = 1;
     if (!c.app && !c.proxy && !c.redir && !c.claim && !c.inspect && c.reg !== 'nina' && G.level >= 2 && Math.random() < 0.35){
-      const r = Math.random(), kind = r < 0.45 ? 'ok' : r < 0.65 ? 'typo' : r < 0.85 ? 'none' : 'dead';
+      const r = Math.random();
+      let kind = r < 0.45 ? 'ok' : r < 0.65 ? 'typo' : r < 0.85 ? 'none' : 'dead';
+      if (kind === 'dead' && G.up.wifi && Math.random() < 0.75) kind = 'ok'; // зарядив телефон від нашої зарядки
       c.sms = {code: String(ri(1000, 9999)), kind, fake: kind === 'dead' && Math.random() < 0.4, other: person().name};
     }
     if (feeOf(c) > 0 && Math.random() < 0.5) c.feeArg = 1;
@@ -1023,6 +1060,11 @@ function spawnClient(force){
     }
     c.hi = reg ? reg.hi : intl ? pick(['Добрий день! Хочу відправити за кордон','Вітаю! Посилку в іншу країну можна?','Здрастуйте, мені за кордон відправити']) : pick(SEND_HI);
     if (intl) c.intl = intl;
+    // термінал самообслуговування: ТТН уже оформлена і оплачена карткою
+    if (!reg && !intl && G.up.kiosk && !c.items.some(isBig) && Math.random() < [0, 0.3, 0.5][G.up.kiosk]){
+      c.self = 1; c.card = true; c.items.forEach(x => { x.self = 1; x.ttn = ttn(); });
+      c.hi = pick(['Я вже все оформив(ла) в терміналі, оплатив(ла) карткою — залишилось тільки прийняти 🖥️','Вітаю! ТТН зробив(ла) сам(а) в терміналі, ось код 📱','Добрий день, я через термінал самообслуговування, все оплачено!']);
+    }
   }
   if (reg){
     const info = regInfo(reg.id);
@@ -1115,7 +1157,7 @@ function rate(sat, c){
   if (c && FLOW && FLOW.cid === c.id) weekServe(sat);
   if (c && c.reg){
     const info = regInfo(c.reg); info.visits++;
-    if (sat >= 4) info.hearts = Math.min(5, info.hearts + 1);
+    if (sat >= 4) info.hearts = Math.min(5, info.hearts + 1 + (G.up.access && Math.random() < 0.5 ? 1 : 0));
     else if (sat < 3) info.hearts = Math.max(0, info.hearts - 1);
   }
   return sat;
@@ -1171,11 +1213,11 @@ function staffTick(dt){
   const crowd = G.queue.length > 6;
   for (const s of G.staff){
     s.away = offToday(s);
-    if (s.training || s.role === 'rest' || s.away){ releaseStaff(s); s.brk = false; continue; }
+    if ((s.training && G.up.school < 2) || s.role === 'rest' || s.away){ releaseStaff(s); s.brk = false; continue; }
     const brk = s.role !== 'courier' && onBreak(s);
     if (brk !== !!s.brk){ s.brk = brk; dirty = true; if (brk) releaseStaff(s); }
-    if (brk){ s.fat = Math.max(0, (s.fat||0) - dt*0.3); continue; }
-    s.fat = Math.min(100, (s.fat||0) + dt*0.17*(hasT(s,'calm') ? 0.5 : crowd ? 1.5 : 1));
+    if (brk){ s.fat = Math.max(0, (s.fat||0) - dt*0.3*[1, 1.5, 2][G.up.lounge || 0]); continue; }
+    s.fat = Math.min(100, (s.fat||0) + dt*0.17*(hasT(s,'calm') ? 0.5 : crowd ? 1.5 : 1)*[1, 0.8, 0.65][G.up.lounge || 0]*(G.up.ac >= 2 ? 0.9 : 1));
     if (s.role === 'courier'){ courierTick(s); continue; }
     if (s.role === 'store'){
       s.t += dt;
@@ -1189,7 +1231,8 @@ function staffTick(dt){
         if (c){ c.by = s.id; s.cl = c.id; s.t = 0; dirty = true; }
       } else {
         s.t += dt;
-        if (s.t >= serveT(s)) staffFinish(s);
+        const sc = G.queue.find(c => c.id === s.cl);
+        if (s.t >= serveT(s) * (sc && sc.self ? 0.6 : 1)) staffFinish(s);
       }
     }
   }
@@ -1226,7 +1269,7 @@ function courierTick(s){
 function courierGo(s, ps, planned){
   const km = routeLen(ps.map(p => p.addr)), opt = optLen(ps.map(p => p.addr));
   ps.forEach(p => { p.state = 'courier'; p.cell = null; });
-  const dur = Math.round((20 + km*10) * staffMul(s) / (1 + (s.lvl - 1)*0.08));
+  const dur = Math.round((20 + km*10) * staffMul(s) / (1 + (s.lvl - 1)*0.08) * [1, 0.85, 0.7, 0.55][G.up.cveh || 0]);
   s.route = {pids:ps.map(p => p.id), back:G.time + dur, km:+km.toFixed(1), opt:+opt.toFixed(1), planned:!!planned};
   dirty = true; return s.route;
 }
@@ -1236,7 +1279,7 @@ function courierBack(s){
   let ok = 0, fail = 0, money = 0;
   for (const id of R.pids){
     const p = G.parcels.find(p => p.id === id); if (!p) continue;
-    if (Math.random() < 0.88){
+    if (Math.random() < 0.88 + [0, 0.03, 0.05, 0.08][G.up.cveh || 0]){
       ok++; money += 35 + Math.round(p.cod*0.02) + (eff > 0.9 ? 15 : 0); G.today.cashIn += p.cod;
       G.parcels = G.parcels.filter(x => x !== p); G.stats.issued++; G.today.issued++;
     } else { fail++; p.state = 'cell'; p.cell = targetCell(p); if (!p.cell){ p.state = 'pile'; } p.inT = G.time; }
@@ -1289,7 +1332,7 @@ function staffFinish(s, forceErr){
     ps.forEach(p => { p.lost = 0; }); giftResult(ps);
     if (c.redir){ ps.forEach(p => redirectParcel(p, c.redir)); money = c.redir.type === 'back' ? 10 : 55; n = ps.length; ps = []; }
     if (c.proxy && !c.proxy.ok){
-      if (Math.random() < 0.45 + s.lvl*0.1){ removeClient(c); toast(`🚫 ${esc(s.name)} не віддав(ла) посилку шахраю`, 'good'); addXp(5); return; }
+      if (Math.random() < 0.45 + s.lvl*0.1 + (G.up.cams ? 0.3 : 0)){ removeClient(c); toast(`🚫 ${esc(s.name)} не віддав(ла) посилку шахраю${G.up.cams ? ' (камера допомогла)' : ''}`, 'good'); addXp(5); return; }
       G.rating = clamp(G.rating - 0.15, 1, 5); toast(`😱 ${esc(s.name)} видав(ла) посилку шахраю! Рейтинг ↓`, 'bad');
     }
     if (c.inspect && c.inspect.bad){ const bp = ps.find(p => p.id === c.inspect.pid); if (bp){ returnParcel(bp); ps = ps.filter(p => p !== bp); money += 15; } }
@@ -1319,6 +1362,8 @@ function staffFinish(s, forceErr){
     const cash = c.kind === 'get' ? codCash + (c.redir && c.redir.type !== 'back' ? REDIR_FEE : 0) : money;
     G.today.cashIn += cash;
     if (err && Math.random() < 0.5) G.today.short += ri(1,6)*10;
+    // фальшива купюра, яку працівник не помітив
+    if (G.level >= 3 && !G.up.counter && cash >= 150 && Math.random() < 0.04){ const f = pick([200, 500]); G.today.short += f; G.today.fake = (G.today.fake||0) + f; }
   }
   removeClient(c);
   const sat = rate((err ? 2 : 4 + (Math.random() < 0.3 ? 1 : 0)) + (hasT(s,'polite') ? 0.5 : 0), c);
@@ -1348,7 +1393,7 @@ function storeAction(s){
 function planAdd(k, n){ if (G.plan && !G.plan.done && n) { G.plan.prog[k] = (G.plan.prog[k]||0) + n; } }
 function labelsUse(n, auto){
   const S = G.sup; if (manualMode()) return true;
-  if (S.lbl < n && auto && S.rolls > 0){ S.rolls--; S.lbl += ROLL; }
+  if (S.lbl < n && auto && S.rolls > 0){ S.rolls--; S.lbl += rollN(); }
   if (S.lbl < n) return false;
   S.lbl -= n; if (S.lbl <= 10 && !S.rolls && !S.warned){ S.warned = 1; toast('🧾 Термострічка майже закінчилась, а запасних рулонів немає! Купи в 🧰 Матеріалах', 'bad'); }
   return true;
@@ -1357,7 +1402,7 @@ function labelsUse(n, auto){
 function printGuard(n){
   if (manualMode()) return true;
   if (G.sup.lbl < n){ FLOW.needRoll = true; sErr(); renderFlow(); return false; }
-  if (Math.random() < 0.05){ FLOW.jam = true; G.sup.lbl = Math.max(0, G.sup.lbl - 1); sErr(); renderFlow(); return false; }
+  if (Math.random() < [0.05, 0.0125, 0][G.up.printer || 0]){ FLOW.jam = true; G.sup.lbl = Math.max(0, G.sup.lbl - 1); sErr(); renderFlow(); return false; }
   labelsUse(n); return true;
 }
 function supplyHTML(c){
@@ -1376,7 +1421,7 @@ function showSupplies(){
       <div class="row" style="margin-top:6px"><button class="sm ok" data-act="buyroll" data-v="1" ${G.money < ROLL_COST ? 'disabled' : ''}>+1 рулон · ${ROLL_COST} ₴</button><button class="sm" data-act="buyroll" data-v="5" ${G.money < ROLL_COST*5 ? 'disabled' : ''}>+5 рулонів · ${fmt(ROLL_COST*5)} ₴</button></div></div>
     <div class="card"><h3>🔋 Сканер</h3><div class="lvl"><i class="on" style="flex:none;width:${Math.max(0, S.bat)}%;background:${S.bat < 20 ? 'var(--red)' : S.bat < 50 ? 'var(--amber)' : 'var(--green)'}"></i></div>
       <div class="mute" style="margin:6px 0">${chg ? `🔌 Заряджається до ${hhmm(S.chg)} — поки що номери вводиш вручну (повільно)` : S.bat <= 0 ? '🪫 Розряджений! Номери вводиш вручну — сканування втричі повільніше.' : `Заряд ${Math.round(S.bat)}%. Кожен «пік» трохи розряджає. Вночі заряджається сам.`}</div>
-      ${day && !chg && S.bat < 100 ? '<button class="sm" data-act="charge">🔌 Поставити на зарядку (25 хв)</button>' : ''}</div>
+      ${day && !chg && S.bat < 100 ? `<button class="sm" data-act="charge">🔌 Поставити на зарядку (${G.up.battery ? 10 : 25} хв)</button>` : ''}</div>
     <div class="card"><h3>🛍️ Вітрина</h3><div class="mute">Клієнти купують товари з вітрини, а ти можеш пропонувати їх під час оплати відправлення (план продажів!). Закупівля — по 10 шт.</div>
       ${Object.entries(SHOP).map(([k,x]) => `<div class="task"><span style="font-size:22px">${x.e}</span><div style="flex:1"><b>${x.n}</b><div class="mute">ціна ${x.p} ₴ · на вітрині: ${st[k]||0}</div></div><button class="sm" data-act="restock" data-k="${k}" ${G.money < x.c*10 ? 'disabled' : ''}>+10 · ${x.c*10} ₴</button></div>`).join('')}</div>`);
 }
@@ -1491,7 +1536,7 @@ function inspFinish(quiet){
   const speed = clamp(5 - I.angry*1.2 - Math.max(0, I.qSum/Math.max(1,I.qN) - 3)*0.4, 1, 5);
   const errs = clamp(5 - I.mist*0.8, 1, 5);
   const avg = (clean + speed + errs)/3;
-  const bonus = avg >= 3.5 ? Math.round((avg - 2.5)*500/50)*50 : 0;
+  const bonus = avg >= 3.5 ? Math.round((avg - 2.5)*500/50)*50 + (G.up.cams ? 100 : 0) : 0;
   I.res = {clean:+clean.toFixed(1), speed:+speed.toFixed(1), errs:+errs.toFixed(1), avg:+avg.toFixed(1), bonus};
   if (bonus){ addMoney(bonus); G.stats.inspGood = (G.stats.inspGood||0) + 1; countTask('insp', 1); }
   if (avg < 2.5) G.rating = clamp(G.rating - 0.1, 1, 5);
@@ -1505,7 +1550,9 @@ function outageTick(){
   const O = G.outage; if (!O || O.done) return;
   if (!O.on && G.time >= O.from){
     O.on = true; FLOW && (FLOW.rows = terminalRows(flowClient() || {phone:''}));
-    if (G.up.gen){ G.money -= 100; toast('🔌 Відключення світла! Генератор запрацював (пальне −100 ₴)', 'gold'); }
+    if (G.up.solar) toast('☀️ Відключення світла! Сонячні панелі й акумулятори тримають усе відділення', 'gold');
+    else if (G.up.gen){ G.money -= 100; toast('🔌 Відключення світла! Генератор запрацював (пальне −100 ₴)', 'gold'); }
+    else if (G.up.starlink) toast('🛰️ Відключення світла! Темно, але Starlink і павербанк тримають термінал — картки й сканер працюють', 'gold');
     else { sErr(); toast('🔦 Відключення світла! Термінал не працює — все вручну, з ліхтариком. Картки не приймаються.', 'bad'); }
     dirty = true;
   }
@@ -1546,7 +1593,7 @@ function invRows(){
   const load = cellLoad(), cells = shuffle(Object.keys(load)).slice(0, 8);
   const rows = cells.map(cell => ({cell, pids: G.parcels.filter(p => p.state === 'cell' && p.cell === cell).map(p => p.id), extra:null, ans:null}));
   // розбіжності: «загублені» посилки і чужа посилка без ТТН
-  shuffle(rows.slice()).slice(0, ri(1, 2)).forEach(r => { const p = G.parcels.find(p => r.pids.includes(p.id) && !p.res); if (p) p.lost = 1; });
+  shuffle(rows.slice()).slice(0, G.up.cams ? ri(0, 1) : ri(1, 2)).forEach(r => { const p = G.parcels.find(p => r.pids.includes(p.id) && !p.res); if (p) p.lost = 1; });
   if (rows.length > 2 && Math.random() < 0.7){ const r = pick(rows.filter(r => !r.pids.some(id => (G.parcels.find(p => p.id === id)||{}).lost))); if (r) r.extra = pickItem().e; }
   I.rows = rows; return rows;
 }
@@ -1592,7 +1639,7 @@ function startDay(){
   const news = [];
   for (const s of G.staff){
     if (s.role === 'rest' || (s.off || []).includes(wd()) || (s.sick || 0) >= G.day || s.training) continue;
-    if (Math.random() < 0.025){ s.sick = G.day + ri(0, 2); news.push(`🤒 ${esc(s.name)} захворів(ла) — лікарняний до дня ${s.sick} (50% зарплати)`); }
+    if (Math.random() < 0.025*[1, 0.6, 0.5][G.up.lounge || 0]){ s.sick = G.day + ri(0, 2); news.push(`🤒 ${esc(s.name)} захворів(ла) — лікарняний до дня ${s.sick} (50% зарплати)`); }
     else if (Math.random() < ((s.mood ?? 80) < 40 ? 0.05 : 0.012)){ s.absent = G.day; news.push(`📵 ${esc(s.name)} не вийшов(ла) на роботу і не бере трубку!`); }
   }
   news.forEach((t, i) => setTimeout(() => toast(t, 'bad'), 3600 + i*700));
@@ -1623,7 +1670,7 @@ function endDay(){
     if (s.role === 'rest' || offToday(s)){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); s.wk = 0; }
     else {
       s.wk = (s.wk || 0) + 1;
-      s.mood = clamp((s.mood ?? 80) - ((s.fat||0) > 60 ? 12 : 4) * (hasT(s,'cheerful') ? 0.5 : 1) + (G.up.coffee ? 3 : 0) + (decorSat() > 0.2 ? 2 : 0) - (s.wk > 5 ? 8 : 0), 0, 100);
+      s.mood = clamp((s.mood ?? 80) - ((s.fat||0) > 60 ? 12 : 4) * (hasT(s,'cheerful') ? 0.5 : 1) + G.up.coffee*3 + (G.up.lounge || 0)*2 + (decorSat() > 0.2 ? 2 : 0) - (s.wk > 5 ? 8 : 0), 0, 100);
       s.fat = Math.max(0, (s.fat||0) - 45);
     }
     if (s.mood < 15 && Math.random() < 0.4) quit.push(s);
@@ -1641,10 +1688,18 @@ function endDay(){
   const misIn = G.parcels.filter(p => p.mis && p.state === 'cell');
   let misFine = 0;
   if (misIn.length){ misFine = 60*misIn.length; G.money -= misFine; G.rating = clamp(G.rating - 0.03*misIn.length, 1, 5); misIn.forEach(misOut); }
-  // термін зберігання 5 днів
-  const old = G.parcels.filter(p => (p.state === 'cell' || p.state === 'locker') && G.day - p.inDay >= 5);
+  // вуличний поштомат 24/7: забирають і вночі
+  let nightLock = 0;
+  if (G.up.locker >= 4){ const lp = G.parcels.filter(p => p.state === 'locker' && !p.res); lp.forEach(p => { if (Math.random() < 0.5){ p.state = 'gone'; nightLock++; } });
+    if (nightLock){ G.parcels = G.parcels.filter(p => p.state !== 'gone'); G.money += 12*nightLock; G.stats.earned += 12*nightLock; G.stats.issued += nightLock; G.stats.locker = (G.stats.locker||0) + nightLock; } }
+  // сонячні панелі продають надлишок у сонячний день
+  let solarInc = 0;
+  if (G.up.solar && G.weather === 'sun'){ solarInc = 60; G.money += 60; G.stats.earned += 60; }
+  // термін зберігання 5 днів (з застосунком — 7)
+  const keep = G.up.app >= 2 ? 7 : 5;
+  const old = G.parcels.filter(p => (p.state === 'cell' || p.state === 'locker') && G.day - p.inDay >= keep);
   if (old.length){ G.parcels = G.parcels.filter(p => !old.includes(p)); G.rating = clamp(G.rating - 0.02*old.length, 1, 5); }
-  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length, peakBonus, season:G.season, misN:misIn.length, misFine, invFine};
+  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length, peakBonus, season:G.season, misN:misIn.length, misFine, invFine, nightLock, solarInc};
   G.ev = null; G.eve = false; G.outage = null; G.insp = null;
   G.day++; G.phase = 'night'; G.time = 480;
   refreshCand(); checkAch(); checkMonth();
@@ -1697,6 +1752,7 @@ function cashResult(v){
   }
   G.money += money;
   const sum = CASH_SUM; CASH_SUM = null;
+  if (sum && sum.fake && k.short) msg += `<br>🕵️ З недостачі <b>${fmt(Math.min(sum.fake, k.short))} ₴</b> — фальшиві купюри, які прийняли в касу. ${G.up.counter ? '' : 'Детектор у покращеннях ловить їх сам.'}`;
   if (sum) sum.cash = {right, short:k.short, money};
   save(); cloudSave(true);
   showModal('🧮 Звірка каси', `<p>${msg}</p><button class="pri" style="width:100%" data-act="cashdone">Далі</button>`);
@@ -1716,7 +1772,7 @@ function tick(){
     G.time += dt*MIN_PER_SEC;
     const dMin = G.time - prev;
     const ev = curEvent();
-    if (ev && ev.extra && prev < 630 && G.time >= 630 && !G.trucksDone.x){ if (G.truck) truckLeave(); truckArrive('x'); }
+    if (ev && (ev.extra || G.up.ramp2) || (G.up.ramp2 && curSeason())) if (prev < 630 && G.time >= 630 && !G.trucksDone.x){ if (G.truck) truckLeave(); truckArrive('x'); }
     if (prev < 780 && G.time >= 780 && !G.trucksDone.d){ if (G.truck) truckLeave(); truckArrive('d'); }
     if (prev < 1080 && G.time >= 1080 && !G.trucksDone.e){ if (G.truck) truckLeave(); truckArrive('e'); }
     if (G.truck && G.time >= G.truck.leaveAt) truckLeave();
@@ -1732,6 +1788,18 @@ function tick(){
         if (Math.random() < 0.35) toast(`🟥 Хтось забрав посилку з поштомату (+${12*got} ₴)`);
       }
     }
+    // сортувальна стрічка розкладає купу по комірках
+    if (G.up.sorter && !darkMode()){
+      G.sortT = (G.sortT || 0) + dMin;
+      const iv = G.up.sorter >= 2 ? 1.5 : 3;
+      if (G.sortT >= iv){
+        G.sortT = 0;
+        for (const p of G.parcels.filter(p => p.state === 'pile' && p.id !== G.hand)){
+          if (p.mis){ if (G.up.sorter >= 2){ misOut(p); toast(`🎢 Стрічка відсіяла пересорт …${String(p.ttn).slice(-4)} (для відділення №${p.mis.br})`); break; } continue; }
+          const cell = targetCell(p); if (cell){ placeParcel(p, cell, true); G.stats.sorted = (G.stats.sorted||0) + 1; break; }
+        }
+      }
+    }
     // нові клієнти
     if (G.time < 1170){
       const h = G.time/60;
@@ -1742,10 +1810,10 @@ function tick(){
     // терпіння
     for (const c of [...G.queue]){
       if (c.by && c.by !== 'me') continue;
-      c.pat -= dt * (c.by === 'me' ? 0.3 : 1);
+      c.pat -= dt * (c.by === 'me' ? 0.3 : qDecay());
       if (c.pat <= 0) clientLeftAngry(c);
     }
-    staffTick(dt * (manualMode() ? 0.6 : 1));
+    staffTick(dt * (manualMode() ? 0.6 : darkMode() ? 0.85 : 1));
     if (G.sup.chg && G.time >= G.sup.chg){ G.sup.chg = 0; G.sup.bat = 100; G.sup.lowBat = 0; toast('🔋 Сканер заряджено!', 'good'); dirty = true; }
     inspTick(); outageTick();
     if (G.time >= 1200) endDay();
@@ -1757,7 +1825,7 @@ function tick(){
 /* ---------- анімований зал ---------- */
 const SCENE = {el:null, spr:new Map(), angry:new Set(), seen:false, is3d:false};
 // міст для 3D-залу (hall3d.js, збирається з src/hall3d.js)
-window.NP3 = {g: () => G, act: (a, el) => act(a, el), manual: () => manualMode(), ev: () => curEvent(), tab: () => TAB, paused: () => paused,
+window.NP3 = {g: () => G, act: (a, el) => act(a, el), manual: () => darkMode(), ev: () => curEvent(), tab: () => TAB, paused: () => paused,
   door: () => sDoor(), beep: (...a) => beep(...a), angry: SCENE.angry, DECOR, WALLS, WEATHER, TIERS,
   LOOKC: k => parseInt(((LOOK_C[k] || LOOK_C.red)[1]).slice(1), 16)};
 function want3D(){ return !!(G && G.settings.s3d !== false && window.Hall3D && Hall3D.ok()); }
@@ -1896,7 +1964,7 @@ function liveUpdate(){
     el.style.width = s.cl ? clamp(s.t/serveT(s)*100, 0, 100).toFixed(0) + '%' : '0%';
   });
   const tl = $('#truckleft'); if (tl && G.truck) tl.textContent = hhmm(G.truck.leaveAt);
-  $('#dark').classList.toggle('hidden', !(G.phase === 'day' && manualMode()));
+  $('#dark').classList.toggle('hidden', !(G.phase === 'day' && darkMode()));
 }
 function clientHTML(c){
   const r = clamp(c.pat/c.max, 0, 1);
@@ -1929,7 +1997,7 @@ function viewHall(){
   const se = curSeason();
   const banners = (se ? `<div class="banner ev">${se.e} <b>${se.n}</b> — ${se.d}</div>` : '') + (ev ? `<div class="banner ev">${ev.e} <b>${ev.n}</b> — ${ev.d}</div>` : G.eve ? '<div class="banner ev">🎉 Завтра свято — сьогодні черга аж до дверей!</div>' : '')
     + (I && I.state === 'on' ? `<div class="banner insp">👔 <b>Перевірка регіонального менеджера</b> до ${hhmm(I.until)} — тримай зал чистим, обслуговуй швидко і без помилок!</div>` : '')
-    + (O && O.on ? (G.up.gen ? '<div class="banner">🔌 Відключення світла — працює генератор.</div>' : `<div class="banner dark">🔦 <b>Світла немає</b> до ≈${hhmm(O.to)}: термінал і сканер не працюють, тільки готівка, персонал повільніший. Купи 🔌 генератор у покращеннях.</div>`) : '');
+    + (O && O.on ? (powerOn() ? `<div class="banner">${G.up.solar ? '☀️ Відключення світла — працюють сонячні панелі.' : '🔌 Відключення світла — працює генератор.'}</div>` : G.up.starlink ? '<div class="banner dark">🛰️ <b>Світла немає</b>, але Starlink тримає термінал — картки й сканер працюють. Персонал у темряві трохи повільніший.</div>' : `<div class="banner dark">🔦 <b>Світла немає</b> до ≈${hhmm(O.to)}: термінал і сканер не працюють, тільки готівка, персонал повільніший. Купи 🔌 генератор у покращеннях.</div>`) : '');
   const dirtLbl = G.dirt < 25 ? 'чисто ✨' : G.dirt < 60 ? 'трохи брудно' : 'брудно! клієнти незадоволені';
   return `${banners}<div id="sceneSlot"></div><div class="card hallcard" style="background:${(WALLS[G.decor.wall]||WALLS.cream)[1]}"><h3>🧍 Черга <span class="mute">(${G.queue.length}/${queueMax()})</span></h3>
     <div class="queue">${G.queue.length ? G.queue.map(clientHTML).join('') : '<div class="mute" style="padding:30px 6px">Поки нікого… Розклади посилки по комірках, щоб клієнти могли їх забрати.</div>'}</div>
@@ -2088,8 +2156,13 @@ function courierCard(){
 function upNext(k){ const u = UPS[k]; const i = G.up[k] - u.start; return i < u.costs.length ? {cost:u.costs[i], need:u.need[i]} : null; }
 const upLock = k => k === 'windows' && G.up.windows >= 4 && G.up.space < 1 ? '🔒 Потрібне розширення приміщення' : '';
 function affordableUps(){ let n = 0; for (const k in UPS){ const nx = upNext(k); if (nx && !upLock(k) && G.level >= nx.need && G.money >= nx.cost) n++; } return n; }
+function upCan(k){ const nx = upNext(k); return !!(nx && !upLock(k) && G.level >= nx.need && G.money >= nx.cost); }
 function viewUps(){
-  return decorCard() + `<div class="ups">${Object.entries(UPS).map(([k,u]) => {
+  const list = Object.entries(UPS).filter(([k]) => UPCAT === 'all' || (UPCAT === 'can' ? upCan(k) : UP_CAT[k] === UPCAT));
+  const cnt = c => c === 'decor' ? '' : c === 'all' ? Object.keys(UPS).length : c === 'can' ? Object.keys(UPS).filter(upCan).length : Object.keys(UPS).filter(k => UP_CAT[k] === c).length;
+  const chips = `<div class="row upchips">${Object.entries(UP_CATS).map(([c,n]) => `<button class="sm ${UPCAT === c ? 'on' : ''}" data-act="upcat" data-v="${c}">${n} <small>${cnt(c)}</small></button>`).join('')}</div>`;
+  if (UPCAT === 'decor') return chips + decorCard();
+  return chips + (list.length ? '' : '<div class="card mute">Зараз нічого не можна купити — заробіть більше або підніміть рівень.</div>') + `<div class="ups">${list.map(([k,u]) => {
     const l = G.up[k], nx = upNext(k), max = u.start + u.costs.length;
     const bars = Array.from({length:max}, (_,i) => `<i class="${i < l ? 'on' : ''}"></i>`).join('');
     return `<div class="card up"><div class="row"><span class="ue">${u.e}</span><div style="flex:1"><b>${u.n}</b><div class="mute">рівень ${l}/${max}</div></div></div>
@@ -2098,7 +2171,7 @@ function viewUps(){
       ${nx ? `<div class="mute" style="margin:4px 0">Далі: ${u.d(l+1)}</div>
         <button class="${G.level>=nx.need && G.money>=nx.cost && !upLock(k) ? 'ok' : ''}" style="width:100%" data-act="buy" data-k="${k}" ${G.level<nx.need||G.money<nx.cost||upLock(k)?'disabled':''}>
         ${upLock(k) || (G.level < nx.need ? `🔒 Потрібен рівень ${nx.need}` : `Купити · ${fmt(nx.cost)} ₴`)}</button>` : '<div class="mute"><b>✅ Максимум</b></div>'}</div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>` + (UPCAT === 'all' ? decorCard() : '');
 }
 
 /* ---------- обслуговування гравцем ---------- */
@@ -2199,10 +2272,17 @@ function payHTML(c, total, label){
     FLOW.pay.given = cands.length ? pick(cands.slice(0,3)) : total + 100;
   }
   if (FLOW.pay.stage === 'change'){
-    const right = FLOW.pay.given - total;
-    if (!FLOW.pay.opts) FLOW.pay.opts = shuffle([...new Set([right, right + pick([10,20,50]), Math.max(5, right - pick([10,20,50]))])].filter(x => x > 0));
-    return `${speaker(c, `Ось, тримайте <b>${FLOW.pay.given} ₴</b>.`)}<div class="terminal">💵 До сплати <b>${total} ₴</b> · отримано <b>${FLOW.pay.given} ₴</b><br>Скільки решти?</div>
-      <div class="opts">${FLOW.pay.opts.map(v => `<button data-act="change" data-v="${v}">${v} ₴</button>`).join('')}</div>`;
+    const P = FLOW.pay, right = P.given - total;
+    if (P.fake === undefined) P.fake = G.level >= 3 && P.given >= 200 && !P.swapped && Math.random() < 0.08;
+    if (!P.opts) P.opts = shuffle([...new Set([right, right + pick([10,20,50]), Math.max(5, right - pick([10,20,50]))])].filter(x => x > 0));
+    const big = P.given >= 200 && !P.swapped;
+    let chk = '';
+    if (big && G.up.counter) chk = P.fake ? '<div class="terminal" style="border-color:var(--red)">🚨 <b>Детектор: купюра ФАЛЬШИВА!</b> Немає захисних ознак.</div>' : '<div class="mute" style="margin:4px 0">💶 Детектор: ✅ купюра справжня</div>';
+    else if (big && P.checked) chk = P.fake ? '<div class="terminal">🔦 На світлі: <b>водяного знаку немає</b>, захисна стрічка намальована… ❌</div>' : '<div class="mute" style="margin:4px 0">🔦 На світлі: водяний знак і захисна стрічка на місці ✅</div>';
+    const bill = big ? `<div class="bill ${P.fake && (P.checked || G.up.counter) ? 'bad' : ''}">💵 <b>${P.given} ₴</b>${P.fake ? '<i>купюра на дотик якась гладенька</i>' : ''}</div>` : '';
+    return `${speaker(c, `Ось, тримайте <b>${P.given} ₴</b>.`)}${bill}${chk}<div class="terminal">💵 До сплати <b>${total} ₴</b> · отримано <b>${P.given} ₴</b><br>Скільки решти?${G.up.counter ? `<br>🧮 Купюролічильник: решта <b>${right} ₴</b>` : ''}</div>
+      <div class="opts">${P.opts.map(v => `<button data-act="change" data-v="${v}">${v} ₴</button>`).join('')}</div>
+      ${big ? `<div class="row" style="margin-top:8px">${!G.up.counter && !P.checked ? '<button class="sm" data-act="billcheck">🔦 Перевірити на світло</button>' : ''}<button class="sm" data-act="billfake">⛔ Фальшива — не приймати</button></div>` : ''}`;
   }
   const man = manualMode();
   return `${speaker(c, man && c.card ? 'Світла нема? Ну добре, тоді готівкою…' : c.card ? 'Можна карткою оплатити?' : 'Я готівкою, добре?')}
@@ -2257,9 +2337,10 @@ function renderFlow(){
     } else if (FLOW.step === 'search'){
       const lp = ps.find(p => p.lost);
       if (!FLOW.grid){
-        const fake = shuffle(ITEMS.slice()).slice(0, 11).map(it => ({e:it.e, l4:String(ri(1000,9999))}));
+        const fake = shuffle(ITEMS.slice()).slice(0, G.up.cams ? 3 : 11).map(it => ({e:it.e, l4:String(ri(1000,9999))}));
         FLOW.grid = shuffle([{e:lp.e, l4:String(lp.ttn).slice(-4), ok:1}, ...fake]);
       }
+      if (G.up.cams) body += `<div class="terminal">📹 На записі камери видно: її поклали на сусідній стелаж. Залишилось кілька варіантів.</div>`;
       body += `<div class="terminal">🔍 Посилка десь на складі. Шукай ТТН що закінчується на <b style="font-size:18px">${String(lp.ttn).slice(-4)}</b> (${lp.e} ${lp.item})</div>
         <div class="sgrid">${FLOW.grid.map((g,i) => `<button class="${g.no?'no':''}" data-act="lostpick" data-v="${i}" ${g.no?'disabled':''}><span class="pe">${g.e}</span>…${g.l4}</button>`).join('')}</div>`;
     } else if (FLOW.step === 'inspect'){
@@ -2405,8 +2486,9 @@ function renderFlow(){
     const LBL = {bigpack:'Пакування', dims:'Габарит', pack:'Пакування', weigh:'Зважування', value:'Вартість', city:'Місто', pay:'Оплата', print:'ТТН', ban:'Перевірка', decl:'Декларація', country:'Країна', cod:'Післяплата'};
     const keys = []; let si = 0;
     c.items.forEach((x,i) => itemSteps(x).forEach(k => { if (i === FLOW.i && k === FLOW.step) si = keys.length; keys.push(k); }));
-    if (FLOW.step === 'pay' || FLOW.step === 'allref') si = keys.length; if (FLOW.step === 'print') si = keys.length + 1;
-    keys.push('pay','print');
+    const tail = c.self ? ['print'] : ['pay','print'];
+    if (FLOW.step === 'pay' || FLOW.step === 'allref') si = keys.length; if (FLOW.step === 'print') si = keys.length + tail.length - 1;
+    keys.push(...tail);
     body += stepsBar(keys.map(k => LBL[k]), si);
     if (FLOW.step === 'value'){
       if (!FLOW.valOpts) FLOW.valOpts = shuffle([...new Set([it.val, it.val*10, Math.max(100, Math.round(it.val/10/100)*100), it.val + pick([1000,2000,500])])]);
@@ -2449,6 +2531,7 @@ function renderFlow(){
       body += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${it.item}</b> · негабарит<div class="mute">${it.packed ? '🏷️ У заводській коробці' : 'Без упаковки'}${it.f ? ' · <b class="fr">⚠ Крихке</b>' : ''}</div></div></div>`;
     }
     if (FLOW.step === 'bigpack'){
+      if (G.up.dimscan) body += `<div class="mute" style="margin-bottom:4px">📏 3D-сканер: ${it.dims.join(' × ')} см · ${it.w.toFixed(1)} кг → тариф за <b>${billW(it)} кг</b></div>`;
       body += `<div class="mute" style="margin-bottom:6px">Пакування негабариту (крихку техніку — тільки в обрешітку):</div><div class="opts">${BIGPACK.map(b => `<button data-act="bigpack" data-v="${b.k}">${b.n}${b.price ? `<br><small>${b.price} ₴</small>` : ''}</button>`).join('')}</div>`;
     } else if (FLOW.step === 'dims'){
       const vw = volW(it), bw = billW(it);
@@ -2468,6 +2551,14 @@ function renderFlow(){
       body += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${it.item}</b><div class="mute">Розмір: ${SIZE_CM[it.s]}</div>${it.f?'<div class="fr"><b>⚠ Крихке</b></div>':''}${it.packed?'<div class="mute">🏷️ Вже запаковано власником</div>':''}</div></div>`;
     }
     if (FLOW.step === 'pack'){
+      if (G.up.packdesk && FLOW.autoI !== FLOW.i){
+        FLOW.autoI = FLOW.i;
+        if (it.f && !it.packed) FLOW.wrap = true;
+        if (G.up.packdesk >= 2 && FLOW.pack === null) FLOW.pack = it.packed || it.s >= 4 ? 9 : it.s;
+      }
+      if (G.up.packdesk) body += `<div class="mute" style="margin-bottom:4px">📦 Стіл пакувальника: ${G.up.packdesk >= 2 ? 'коробку й плівку підібрано' : it.f && !it.packed ? 'плівку для крихкого вже відміряно' : 'все під рукою'}${G.up.dimscan ? ` · 📏 автоваги: <b>${it.w.toFixed(1)} кг</b>` : ''}</div>`;
+      else if (G.up.dimscan) body += `<div class="mute" style="margin-bottom:4px">📏 Автоваги: <b>${it.w.toFixed(1)} кг</b></div>`;
+      if (c.self && FLOW.i === 0) body += `<div class="terminal">🖥️ ТТН оформлено в терміналі самообслуговування: ${c.items.map(x => `${x.e} → ${x.city}${x.val ? `, ${fmt(x.val)} ₴` : ''}${x.cod ? `, післяплата ${fmt(x.cod)} ₴` : ''}`).join('; ')} · ✅ оплачено карткою</div>`;
       body += `<div class="mute" style="margin-bottom:6px">Обери пакування:</div><div class="opts">${PACK.map(p => `<button class="${FLOW.pack===p.k?'on':''}" data-act="packsel" data-v="${p.k}">${p.e} ${p.n}${p.price?`<br><small>${p.price} ₴</small>`:''}</button>`).join('')}</div>
         <label class="row" style="margin:10px 0"><input type="checkbox" data-act="wrap" style="width:auto" ${FLOW.wrap?'checked':''}> 🫧 Пухирцева плівка (+15 ₴)</label>
         <button class="pri" style="width:100%" data-act="pack" ${FLOW.pack===null?'disabled':''}>Запакувати</button>`;
@@ -2493,8 +2584,11 @@ function renderFlow(){
   showModal(`${c.av} ${esc(c.name)}${reg?' ⭐':''}`, `<div class="pat" style="margin:-4px 0 10px"><i data-pat="${c.id}" style="width:${pr*100}%"></i></div>${body}`, true);
 }
 function itemSteps(it){
-  if (it.intl) return ['ban','pack','weigh','decl','country'];
-  const k = isBig(it) ? ['bigpack','dims'] : ['pack','weigh']; if (it.val) k.push('value'); k.push('city'); if (it.cod) k.push('cod');
+  const auto = G && G.up.dimscan;
+  if (it.intl) return auto ? ['ban','pack','decl','country'] : ['ban','pack','weigh','decl','country'];
+  const k = isBig(it) ? (auto ? ['bigpack'] : ['bigpack','dims']) : (auto ? ['pack'] : ['pack','weigh']);
+  if (it.self) return k; // місто, вартість і післяплата вже в терміналі
+  if (it.val) k.push('value'); k.push('city'); if (it.cod) k.push('cod');
   return k;
 }
 // перехід до наступного кроку відправлення (або наступної речі / оплати)
@@ -2503,8 +2597,9 @@ function advItem(c, from){
   FLOW.valOpts = FLOW.cityOpts = FLOW.declOpts = FLOW.codOpts = FLOW.dimOpts = null; FLOW.measured = false;
   if (nx){ FLOW.step = nx; if (nx === 'weigh') FLOW.weighed = false; return; }
   if (!it.refused && !it.ttn) it.ttn = ttn();
+  if (isBig(it) && !it.bw) it.bw = billW(it);
   if (FLOW.i < c.items.length - 1){ FLOW.i++; FLOW.step = itemSteps(c.items[FLOW.i])[0]; FLOW.pack = null; FLOW.wrap = false; FLOW.weighed = false; }
-  else FLOW.step = c.items.some(x => !x.refused) ? 'pay' : 'allref';
+  else FLOW.step = c.items.some(x => !x.refused) ? (c.self ? 'print' : 'pay') : 'allref';
 }
 function getSteps(c){
   const ps = G.parcels.filter(p => c.pids.includes(p.id));
@@ -2531,7 +2626,7 @@ function flowTotal(c){
   const sum = G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0) + (FLOW && FLOW.feeWaived ? 0 : feeOf(c));
   return FLOW && FLOW.codLess ? sum - FLOW.codLess : sum;
 }
-function manualMode(){ return !!(G.outage && G.outage.on && !G.up.gen); }
+function manualMode(){ return darkMode() && !G.up.starlink; }
 function dayStr(off){ const d = new Date(Date.now() + off*864e5); return d.toLocaleDateString('uk-UA'); }
 function proxyHTML(c, p){
   const x = c.proxy;
@@ -2669,8 +2764,8 @@ function flowAct(act, el){
     FLOW.step = nextGetStep(c, 'codchk'); return renderFlow();
   }
   if (act === 'fixjam'){ FLOW.jam = false; c.pat -= 3; beep(300, 0.2, 'sawtooth', 0.03); toast('🔧 Етикетку витягнуто — друкуй ще раз'); return renderFlow(); }
-  if (act === 'newroll'){ if (G.sup.rolls <= 0) return; G.sup.rolls--; G.sup.lbl += ROLL; G.sup.warned = 0; FLOW.needRoll = false; c.pat -= 4; beep(600, 0.1, 'triangle'); toast('🧾 Новий рулон стоїть — друкуй'); return renderFlow(); }
-  if (act === 'rushroll'){ G.money -= ROLL_RUSH; G.time += 20; G.sup.lbl += ROLL; FLOW.needRoll = false; c.pat -= 10; sCash(); toast(`🚕 Рулон привезли (−${ROLL_RUSH} ₴, −20 хв)`, 'bad'); return renderFlow(); }
+  if (act === 'newroll'){ if (G.sup.rolls <= 0) return; G.sup.rolls--; G.sup.lbl += rollN(); G.sup.warned = 0; FLOW.needRoll = false; c.pat -= 4; beep(600, 0.1, 'triangle'); toast('🧾 Новий рулон стоїть — друкуй'); return renderFlow(); }
+  if (act === 'rushroll'){ G.money -= ROLL_RUSH; G.time += 20; G.sup.lbl += rollN(); FLOW.needRoll = false; c.pat -= 10; sCash(); toast(`🚕 Рулон привезли (−${ROLL_RUSH} ₴, −20 хв)`, 'bad'); return renderFlow(); }
   if (act === 'bigpack'){
     const it = c.items[FLOW.i], right = bigPackRight(it);
     if (v !== right && !(v === 'crate' && right === 'stretch')){ mistake(right === 'crate' ? 'Крихку техніку відправляють тільки в дерев’яній обрешітці!' : right === 'own' ? 'Він уже в заводській коробці — пакування не потрібне' : 'Без пакування не можна — обгорни стретч-плівкою з кутиками'); return renderFlow(); }
@@ -2763,9 +2858,23 @@ function flowAct(act, el){
     if (v === 'card') nextAfterPay(c); else { FLOW.pay.stage = 'change'; }
     return renderFlow();
   }
+  if (act === 'billcheck'){ FLOW.pay.checked = true; c.pat -= 2; beep(900, 0.06, 'sine', 0.03); return renderFlow(); }
+  if (act === 'billfake'){
+    const P = FLOW.pay, total = flowTotal(c);
+    if (!P.fake){ mistake('Купюра справжня! Клієнт образився'); FLOW.extra -= 0.5; return renderFlow(); }
+    sScan(); addXp(12); countTask('fraud', 1); G.stats.fraud = (G.stats.fraud||0) + 1; G.stats.fakes = (G.stats.fakes||0) + 1;
+    toast(`🕵️ Фальшиву купюру не прийнято! ${esc(c.name)}: «Ой, мені її на базарі дали…» +12 XP`, 'good');
+    const g2 = [50, 100].map(b => Math.ceil((total + 1)/b)*b).find(b => b > total) || total + 50;
+    FLOW.pay = {stage:'change', given:g2, swapped:true, fake:false};
+    return renderFlow();
+  }
   if (act === 'change'){
     const total = flowTotal(c), right = FLOW.pay.given - total;
     const reg = total + (FLOW.codLess || 0); // термінал фіксує повну суму з ТТН
+    if (FLOW.pay.fake && +v === right){
+      // прийняли фальшивку: виявиться при інкасації
+      G.today.short += FLOW.pay.given; G.today.fake = (G.today.fake||0) + FLOW.pay.given;
+    }
     if (+v === right){ sCash(); G.today.cashIn += reg; nextAfterPay(c); countTask('cash', 1); }
     else if (+v > right){
       // зайву решту клієнт забрав — в касі буде недостача
@@ -2928,6 +3037,8 @@ function showDaySummary(s){
     ${s.returned?`<span>🔙 Не розвантажено з машин</span><b>${s.returned}</b>`:''}
     ${s.misN?`<span>🔀 Пересорт лежав у комірках</span><b>${s.misN} · −${fmt(s.misFine)} ₴</b>`:''}
     ${s.invFine?`<span>📋 Інвентаризацію не зроблено</span><b>−${fmt(s.invFine)} ₴</b>`:''}
+    ${s.nightLock?`<span>🌙 Забрали з поштомату вночі</span><b>${s.nightLock} · +${fmt(s.nightLock*12)} ₴</b>`:''}
+    ${s.solarInc?`<span>☀️ Продаж енергії з панелей</span><b>+${fmt(s.solarInc)} ₴</b>`:''}
     ${s.cash ? `<span>🧮 Звірка каси</span><b>${s.cash.right && !s.cash.short ? '✅ зійшлась' : s.cash.money < 0 ? '−' + fmt(-s.cash.money) + ' ₴' : '✅'}</b>` : ''}
     ${s.insp ? `<span>👔 Перевірка менеджера</span><b>${s.insp.avg}/5${s.insp.bonus ? ' · +' + fmt(s.insp.bonus) + ' ₴' : ''}</b>` : ''}
     <span>⭐ Рейтинг відділення</span><b>${G.rating.toFixed(2)}</b></div>
@@ -2938,7 +3049,7 @@ function showDaySummary(s){
     ${(s.quit||[]).length ? `<p class="fr">😞 Звільнились через поганий настрій: ${s.quit.map(x => esc(x.name)).join(', ')}</p>` : ''}
     ${s.trained.length ? `<p>📚 Навчання завершили: ${s.trained.map(x => esc(x.name) + ' → ' + stars(x.lvl)).join(', ')}</p>` : ''}
     ${G.money < 0 ? '<p class="fr"><b>⚠ Гроші в мінусі! Заробіть більше або зменшіть персонал.</b></p>' : ''}
-    <p class="mute">Посилки зберігаються в комірках 5 днів (з 4-го дня — платно), потім повертаються відправнику.</p>
+    <p class="mute">Посилки зберігаються в комірках ${G.up.app >= 2 ? 7 : 5} днів (з 4-го дня — платно), потім повертаються відправнику.</p>
     <button class="pri" style="width:100%" data-act="mclose">Добре</button>`);
 }
 function showLevelUp(unl){
@@ -3000,7 +3111,7 @@ function act(a, el){
     case 'scanhint': return toast('📟 Затисни штрихкод на посилці, щоб відсканувати');
     case 'supplies': return showSupplies();
     case 'buyroll': { const n = +el.dataset.v || 1; if (G.money < n*ROLL_COST) return toast('Не вистачає грошей', 'bad'); G.money -= n*ROLL_COST; G.sup.rolls += n; G.sup.warned = 0; sCash(); dirty = true; return showSupplies(); }
-    case 'charge': { if (G.phase !== 'day') return; G.sup.chg = G.time + 25; toast('🔌 Сканер на зарядці 25 хв — поки що номери вводиш вручну'); dirty = true; return showSupplies(); }
+    case 'charge': { if (G.phase !== 'day') return; const cm = G.up.battery ? 10 : 25; G.sup.chg = G.time + cm; toast(`🔌 Сканер на зарядці ${cm} хв — поки що номери вводиш вручну`); dirty = true; return showSupplies(); }
     case 'restock': { const k = el.dataset.k, x = SHOP[k]; if (!x) return; if (G.money < x.c*10) return toast('Не вистачає грошей', 'bad'); G.money -= x.c*10; G.shopStock[k] = (G.shopStock[k]||0) + 10; sCash(); dirty = true; return showSupplies(); }
     case 'invopen': if (!G.inv || G.inv.state !== 'due') return; return showInv();
     case 'invans': { const r = invRows()[id]; if (r){ r.ans = el.dataset.v; showInv(); } return; }
@@ -3112,6 +3223,7 @@ function act(a, el){
       const cost = trainCost(s);
       if (G.money < cost) return toast('Не вистачає грошей', 'bad');
       G.money -= cost; s.training = G.day;
+      if (G.up.school >= 2){ toast(`🎓 ${esc(s.name)} навчається в класі без відриву від роботи — новий рівень після зміни`); dirty = true; return; }
       if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; s.cl = null; }
       toast(`📚 ${esc(s.name)} пішов(ла) на навчання до кінця дня ${G.day}`); dirty = true; return;
     }
@@ -3127,6 +3239,7 @@ function act(a, el){
       G.cand = G.cand.filter(x => x.id !== id); G.staff.push(s);
       toast(`👋 ${esc(s.name)} тепер працює у вас!`, 'good'); dirty = true; return;
     }
+    case 'upcat': UPCAT = el.dataset.v || 'all'; dirty = true; return;
     case 'buy': {
       const k = el.dataset.k, nx = upNext(k); if (!nx || upLock(k) || G.level < nx.need || G.money < nx.cost) return;
       G.money -= nx.cost; G.up[k]++; sCash();
