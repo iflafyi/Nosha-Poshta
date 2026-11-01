@@ -544,13 +544,15 @@ function buildExtras(){
 const BODY = [0x3b6ea5, 0xc0392b, 0x2e8b57, 0x8e44ad, 0xd35400, 0x16a085, 0x7f8c8d, 0x2c3e50, 0xb8860b, 0x9b59b6, 0x1f618d, 0xa04000, 0xe84393, 0x00897b];
 const LEGS = [0x2c3e50, 0x34495e, 0x1b2631, 0x4a4a4a, 0x5d4037, 0x1a237e];
 const capsule = () => cached('cap', () => new CapsuleGeometry(0.2, 0.4, 4, 10));
-function makePerson(key, av, {seed = 0, uniform = false, reg = false} = {}){
+function makePerson(key, av, {seed = 0, uniform = false, reg = false, color = null, hat = '', badge = ''} = {}){
   const g = new Group(), r = rng(seed || hash(key));
-  const bc = uniform ? 0xd7262b : BODY[Math.floor(r() * BODY.length)], lc = uniform ? 0x2c3e50 : LEGS[Math.floor(r() * LEGS.length)];
+  const bc = color != null ? color : uniform ? 0xd7262b : BODY[Math.floor(r() * BODY.length)], lc = uniform ? 0x2c3e50 : LEGS[Math.floor(r() * LEGS.length)];
   const body = mesh(capsule(), lam(bc), 0, 1.02, 0, g); body.scale.set(1, 1, 0.8);
   const legs = [-0.1, 0.1].map(x => { const p = new Group(); p.position.set(x, 0.72, 0); g.add(p); blk(0.13, 0.7, 0.15, lc, 0, -0.7, 0, p); return p; });
   const arms = [-0.27, 0.27].map(x => { const p = new Group(); p.position.set(x, 1.25, 0); g.add(p); blk(0.1, 0.48, 0.11, bc, 0, -0.46, 0, p); return p; });
   const head = emojiSprite(av, 0.62); head.position.y = 1.62; g.add(head); head._e = av;
+  if (hat){ const h = emojiSprite(hat, 0.44); h.position.y = 1.98; g.add(h); }
+  if (badge){ const b = plane(0.3, 0.09, plateTex(badge, {w: 256, h: 76, bg: '#ffffff', fg: '#222', font: 'bold 38px system-ui,sans-serif', r: 8}), 0.08, 1.2, 0.17, 0, g); b.renderOrder = 2; }
   const mood = emojiSprite('😐', 0.34); mood.position.y = 2.08; mood.visible = false; g.add(mood);
   const carry = blk(0.34, 0.26, 0.3, 0xc49a6c, 0, 0.92, 0.3, g); carry.visible = false;
   const receipt = mesh(new PlaneGeometry(0.14, 0.2), lam(0xffffff, {side: 2}), 0.27, 0.85, 0.12, g); receipt.rotation.x = -0.3; receipt.visible = false;
@@ -628,9 +630,10 @@ function sync(){
   // оператори
   const want = new Map();
   for (let k = 0; k < wins; k++){
-    const st = k === 0 ? {id: 'me', av: '🧑‍💼', cl: G.queue.some(c => c.by === 'me')} : front[k - 1];
+    const L = G.look || {};
+    const st = k === 0 ? {id: 'me', av: L.e || '🧑‍💼', cl: G.queue.some(c => c.by === 'me'), look: L} : front[k - 1];
     if (!st) continue;
-    want.set(`op${k}:${st.id}:${st.av}`, {kind: 'op', w: k, st});
+    want.set(`op${k}:${st.id}:${st.av}` + (k === 0 ? `:${L.c || ''}:${L.hat || ''}:${L.badge !== false ? 1 : 0}` : ''), {kind: 'op', w: k, st});
   }
   // складські працівники
   (G.staff || []).filter(s => s.role === 'store' && !s.training && !s.away).slice(0, 4).forEach(s => want.set(`st${s.id}:${s.av}`, {kind: 'store', st: s}));
@@ -650,7 +653,8 @@ function sync(){
         P.kindC = w.c.kind;
         if (R.seen && br.tab() === 'hall') br.door();
       } else if (w.kind === 'op'){
-        P = makePerson(key, w.st.av, {uniform: true});
+        const L = w.st.look;
+        P = makePerson(key, w.st.av, L ? {uniform: true, color: br.LOOKC(L.c), hat: L.hat || '', badge: L.badge !== false ? String(G.nick || '').slice(0, 14) : ''} : {uniform: true});
         P.pos.set(WX(w.w + 1), 0, OP_Z); P.yaw = 0; P.face = 0; P.sit = true; P.drop = 0.1; P.goal = [WX(w.w + 1), OP_Z];
       } else if (w.kind === 'store'){
         P = makePerson(key, w.st.av, {uniform: true});

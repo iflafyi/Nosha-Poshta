@@ -226,6 +226,15 @@ main{padding:4px 10px}
 .sgrid button .pe{font-size:22px;display:block}
 .sgrid button.no{opacity:.35}
 .opened{font-size:46px;text-align:center;padding:6px}
+  .opav{position:relative;display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:var(--uc);flex:none;margin-top:10px;font-style:normal}
+  .opav i{font-style:normal}
+  .opav .face{font-size:28px;line-height:1}
+  .opav .hat{position:absolute;top:-14px;font-size:22px}
+  .opav .bdg{position:absolute;bottom:-8px;background:#fff;color:#222;font-size:9px;font-weight:700;padding:0 4px;border-radius:4px;border:1px solid var(--uc);white-space:nowrap;max-width:70px;overflow:hidden}
+  .opav.big{width:72px;height:72px;margin:16px 8px 8px}
+  .opav.big .face{font-size:44px}
+  .opav.big .hat{top:-20px;font-size:34px}
+  .opav.big .bdg{font-size:11px;bottom:-10px;max-width:90px}
   .sched{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:6px}
   .sched .mute{margin-right:4px;font-size:12px}
   .sched button{padding:3px 7px;font-size:12px;min-width:0;border-radius:8px}
@@ -251,7 +260,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011903; // ставиться build.py
+const GAME_BUILD = 202611011905; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -370,6 +379,29 @@ const UPS = {
   tier:{n:'Розширення відділення', e:'🏢', start:0, costs:[6000,15000,35000], need:[5,10,15], d:l=>`${TIERS[l]}: клієнтів +${l*35}%, більші машини, до ${staffMax(l)} працівників.`},
 };
 const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', courier:'🛵 Кур’єр', rest:'😴 Вихідний'};
+/* ---------- мій оператор ---------- */
+const LOOK_E = ['🧑‍💼','👨‍💼','👩‍💼','👨','👩','🧔','👱‍♂️','👱‍♀️','👨‍🦰','👩‍🦰','👨‍🦱','👩‍🦱','🧑‍🦲','👩‍🦳','👴','👵','🧕','🧑‍🦱'];
+const LOOK_C = {red:['Фірмова червона','#d7262b'], navy:['Темно-синя','#1f3a5f'], green:['Зелена','#2a9d55'], grey:['Сіра','#7f8c8d'], black:['Чорна','#2c2c2c'], purple:['Фіолетова','#7d3c98'], orange:['Помаранчева','#e67e22']};
+const LOOK_H = {'':['Без головного убору',0], '🧢':['Кепка',0], '👒':['Капелюх',0], '🎩':['Циліндр',1], '🎓':['Шапочка випускника',1], '🎅':['Шапка Діда Мороза',0,'win'], '👑':['Корона',3]};
+const lookOf = l => Object.assign({e:'🧑‍💼', c:'red', hat:'', badge:true}, l || {});
+function opHTML(l, nick, big){
+  l = lookOf(l); const col = (LOOK_C[l.c] || LOOK_C.red)[1];
+  return `<span class="opav ${big ? 'big' : ''}" style="--uc:${col}">${l.hat ? `<i class="hat">${l.hat}</i>` : ''}<i class="face">${l.e}</i>${l.badge && nick ? `<i class="bdg">${esc(String(nick).slice(0, 14))}</i>` : ''}</span>`;
+}
+function lookCard(){
+  return `<div class="card"><h3>🧑‍💼 Мій оператор</h3><div class="row" style="align-items:center">${opHTML(G.look, G.nick, true)}<div style="flex:1"><b>${esc(G.nick)}</b><div class="mute">${RANKS[G.rank].n}. Таким тебе бачать клієнти у 3D-залі й друзі, коли заходять у гості.</div></div>
+    <button class="sm pri" data-act="lookedit">✏️ Змінити</button></div></div>`;
+}
+function showLook(){
+  const l = G.look = lookOf(G.look);
+  showModal('🧑‍💼 Мій оператор', `<div style="text-align:center;margin-bottom:8px">${opHTML(l, G.nick, true)}</div>
+    <div class="mute">Обличчя:</div><div class="row" style="gap:4px;margin:4px 0 10px">${LOOK_E.map(e => `<button class="sm ${l.e === e ? 'on' : ''}" style="font-size:22px;padding:4px 6px" data-act="lookset" data-k="e" data-v="${e}">${e}</button>`).join('')}</div>
+    <div class="mute">Колір форми:</div><div class="row" style="gap:4px;margin:4px 0 10px">${Object.entries(LOOK_C).map(([k,[n,c]]) => `<button class="sm ${l.c === k ? 'on' : ''}" style="border:3px solid ${l.c === k ? 'var(--ink)' : c};background:${c};color:#fff" data-act="lookset" data-k="c" data-v="${k}">${n}</button>`).join('')}</div>
+    <div class="mute">Головний убір:</div><div class="row" style="gap:4px;margin:4px 0 10px">${Object.entries(LOOK_H).map(([k,[n,rk,w]]) => { const lock = G.rank < rk ? `🔒 ${RANKS[rk].n}` : w && !winterShop() && l.hat !== k ? '🔒 тільки взимку' : '';
+      return `<button class="sm ${l.hat === k ? 'on' : ''}" data-act="lookset" data-k="hat" data-v="${k}" ${lock ? 'disabled' : ''}>${k || '—'} ${n}${lock ? `<br><small>${lock}</small>` : ''}</button>`; }).join('')}</div>
+    <label class="row" style="margin-bottom:10px"><input type="checkbox" style="width:auto" data-act="lookbadge" ${l.badge ? 'checked' : ''}> 📛 Бейдж з ім’ям на формі</label>
+    <button class="pri" style="width:100%" data-act="lookok">Готово</button>`);
+}
 const WD = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const wd = (d = G.day) => (d - 1) % 7;
 const LUNCH = [720, 750, 780, 810, 840];
@@ -598,7 +630,7 @@ function newGame(nick, branch){
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
     season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null, district:null, streak:null, month:null, expect:[],
-    sup:{rolls:2, lbl:ROLL, bat:100, chg:0}, shopStock:{box:6, tape:6, wrap:6, env:6, card:6, pen:6}, plan:null, inv:null,
+    sup:{rolls:2, lbl:ROLL, bat:100, chg:0}, look:null, shopStock:{box:6, tape:6, wrap:6, env:6, card:6, pen:6}, plan:null, inv:null,
     staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
 }
 function migrate(g){
@@ -1726,7 +1758,8 @@ function tick(){
 const SCENE = {el:null, spr:new Map(), angry:new Set(), seen:false, is3d:false};
 // міст для 3D-залу (hall3d.js, збирається з src/hall3d.js)
 window.NP3 = {g: () => G, act: (a, el) => act(a, el), manual: () => manualMode(), ev: () => curEvent(), tab: () => TAB, paused: () => paused,
-  door: () => sDoor(), beep: (...a) => beep(...a), angry: SCENE.angry, DECOR, WALLS, WEATHER, TIERS};
+  door: () => sDoor(), beep: (...a) => beep(...a), angry: SCENE.angry, DECOR, WALLS, WEATHER, TIERS,
+  LOOKC: k => parseInt(((LOOK_C[k] || LOOK_C.red)[1]).slice(1), 16)};
 function want3D(){ return !!(G && G.settings.s3d !== false && window.Hall3D && Hall3D.ok()); }
 function sceneEl(){
   if (!SCENE.el){
@@ -2117,7 +2150,7 @@ function viewCareer(){
     ${Object.entries(BIZ).map(([k,b]) => { const on = G.biz[k];
       return `<div class="task"><span style="font-size:24px">${b.av}</span><div style="flex:1"><b>${b.n}</b><div class="mute">${b.d} Тариф ${b.rate} ₴/шт${on ? ` · ✅ діє з дня ${on.since}${on.strikes ? ` · ⚠ скарг ${on.strikes}/3` : ''}` : ''}</div></div>
         ${on ? `<button class="sm ghost" data-act="bizend" data-k="${k}">Розірвати</button>` : G.level < b.lvl ? `<span class="mute">🔒 рів. ${b.lvl}</span>` : `<button class="sm ok" data-act="bizsign" data-k="${k}" ${bizN >= bizMax() ? 'disabled' : ''}>Підписати</button>`}</div>`; }).join('')}</div>`;
-  return rankH + strH + tasksH + planCard() + bizH + brH + achH;
+  return lookCard() + rankH + strH + tasksH + planCard() + bizH + brH + achH;
 }
 function cityMap(pickAct, sel){
   const all = [{branch:G.branch, city:G.city, district:G.district, rating:G.rating, cur:1}, ...G.others];
@@ -2972,6 +3005,13 @@ function act(a, el){
     case 'invopen': if (!G.inv || G.inv.state !== 'due') return; return showInv();
     case 'invans': { const r = invRows()[id]; if (r){ r.ans = el.dataset.v; showInv(); } return; }
     case 'invdone': return invDone();
+    case 'lookedit': return showLook();
+    case 'lookset': { G.look = lookOf(G.look); const k = el.dataset.k, v = el.dataset.v;
+      if (k === 'hat'){ const h = LOOK_H[v]; if (!h || G.rank < h[1] || (h[2] && !winterShop() && G.look.hat !== v)) return; }
+      if (k === 'e' && !LOOK_E.includes(v)) return; if (k === 'c' && !LOOK_C[v]) return;
+      G.look[k] = v; save(); dirty = true; return showLook(); }
+    case 'lookbadge': G.look = lookOf(G.look); G.look.badge = !!el.checked; save(); dirty = true; return;
+    case 'lookok': closeModal(); cloudSave(true); toast('🧑‍💼 Вигляд оператора збережено', 'good'); dirty = true; return;
     case 'sched': { const s = G.staff.find(s => s.id === id); if (!s) return; const d = +el.dataset.v; s.off = s.off || [];
       if (s.off.includes(d)) s.off = s.off.filter(x => x !== d); else { if (s.off.length >= 3) return toast('Максимум 3 вихідні на тиждень', 'bad'); s.off.push(d); }
       if (G.phase === 'day' && d === wd()) toast(s.off.includes(d) ? `🏖️ ${esc(s.name)} пішов(ла) додому — сьогодні вихідний` : `👋 ${esc(s.name)} вийшов(ла) на роботу`);
@@ -3146,7 +3186,7 @@ document.addEventListener('click', e => {
   if (a && a.dataset.act) act(a.dataset.act, a);
 });
 document.addEventListener('pointermove', e => { const d = $('#dark'); if (d && !d.classList.contains('hidden')){ d.style.setProperty('--fx', e.clientX + 'px'); d.style.setProperty('--fy', e.clientY + 'px'); } }, {passive:true});
-document.addEventListener('change', e => { const a = e.target.closest('[data-act="wrap"]'); if (a) flowAct('wrap', a); });
+document.addEventListener('change', e => { const a = e.target.closest('[data-act="wrap"]'); if (a) flowAct('wrap', a); const b = e.target.closest('[data-act="lookbadge"]'); if (b) act('lookbadge', b); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'chatin') chatSend(); });
 
 /* ---------- збереження ---------- */
@@ -3193,7 +3233,7 @@ function weekServe(sat){
 const WCATS = {parcels:['📦','Посилки','посилок за тиждень'], clean:['✅','Без помилок','обслуговувань без жодної помилки'], rating:['⭐','Оцінки','середня оцінка клієнтів (від 30 обслуговувань)'], speed:['⚡','Швидкість','середній час обслуговування, с (від 30)']};
 function hallPayload(){
   return {wall:G.decor.wall, items:Object.keys(G.decor.items||{}).slice(0,20), tier:G.up.tier, win:G.up.windows, staff:G.staff.slice(0,10).map(s => s.av),
-    badges:(G.badges||[]).slice(-8).map(b => b.e), branches:1 + G.others.length, regs:Object.values(G.regs).filter(r => r.met).length, coffee:G.up.coffee, locker:G.up.locker};
+    badges:(G.badges||[]).slice(-8).map(b => b.e), branches:1 + G.others.length, regs:Object.values(G.regs).filter(r => r.met).length, coffee:G.up.coffee, locker:G.up.locker, look:lookOf(G.look), space:G.up.space};
 }
 function statsPayload(){ const w = weekParcels(); return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1, rank:G.rank, hall:hallPayload(), wk:w.k, wk_parcels:w.n, wk_clean:w.clean, wk_served:w.served, wk_sat:w.sat, wk_spd:w.spd}; }
 async function cloudSave(force){
@@ -3469,7 +3509,7 @@ function viewOnline(){
     <div class="mute" style="margin-bottom:6px">Натисни на відділення, щоб зайти в гості, залишити відгук або надіслати подарунок.</div>
     ${!top ? '<div class="mute">Завантаження…</div>' : !top.length ? '<div class="mute">Поки нікого. Будь першим!</div>' :
     `<table class="lb"><tr><th>#</th><th>Відділення</th><th>Рів.</th><th>⭐</th><th>📦</th></tr>${top.map((p,i) => `<tr class="${p.id===G.pid?'mine':''}" data-act="player" data-id="${p.id}" style="cursor:pointer">
-      <td>${i+1}</td><td><span class="dot ${p.online?'on':''}"></span>${RANKS[p.rank||0].e} <b data-nol10n>${esc(p.nickname)}</b> ${((p.hall||{}).badges||[]).join('')}<div class="mute" data-nol10n>${esc(p.branch)}${p.rev_n ? ` · відгуки ${p.rev_avg}★ (${p.rev_n})` : ''}</div></td><td>${p.level}</td><td>${(+p.rating).toFixed(2)}</td><td>${fmt(p.parcels)}</td></tr>`).join('')}</table>`}</div>`;
+      <td>${i+1}</td><td><span class="dot ${p.online?'on':''}"></span>${(p.hall||{}).look ? lookOf(p.hall.look).e : RANKS[p.rank||0].e} <b data-nol10n>${esc(p.nickname)}</b> ${((p.hall||{}).badges||[]).join('')}<div class="mute" data-nol10n>${esc(p.branch)}${p.rev_n ? ` · відгуки ${p.rev_avg}★ (${p.rev_n})` : ''}</div></td><td>${p.level}</td><td>${(+p.rating).toFixed(2)}</td><td>${fmt(p.parcels)}</td></tr>`).join('')}</table>`}</div>`;
 }
 function afterOnline(){ if (NET.sub === 'chat') drawChat(); }
 async function showPlayer(id){
@@ -3483,9 +3523,9 @@ async function showPlayer(id){
     const my = revs && revs.find(r => r.from_id === G.pid);
     const st = NET.revStars || (my ? my.stars : 5);
     showModal(`🏤 У гостях: ${esc(p.nickname)}`, `<div class="card hallcard" style="background:${(WALLS[h.wall]||WALLS.cream)[1]}">${decorStrip({items:Object.fromEntries((h.items||[]).map(k => [k,1]))})}
-        <h3 data-nol10n>${esc(p.branch)}</h3><div class="mute">${RANKS[p.rank||0].e} ${RANKS[p.rank||0].n} · ${TIERS[h.tier||0]} · ${seen}</div>
+        <div class="row" style="align-items:center">${opHTML(h.look, p.nickname, true)}<div style="flex:1"><h3 data-nol10n>${esc(p.branch)}</h3><div class="mute">${RANKS[p.rank||0].e} ${RANKS[p.rank||0].n} · ${TIERS[h.tier||0]}${h.space ? ' · 🏗️ розширене' : ''} · ${seen}</div></div></div>
         <div class="visit"><div class="vq">${Array.from({length:Math.min(6, 2 + (h.regs||0))}, () => pick([...AV_M, ...AV_F])).map(a => `<span>${a}</span>`).join('')}</div>
-        <div class="counter"></div><div class="vw">${Array.from({length:h.win||1}, (_,i) => `<span title="Віконце ${i+1}">🪟${i === 0 ? '🧑‍💼' : (h.staff||[])[i-1] || ''}</span>`).join('')}${h.coffee ? '<span>☕</span>' : ''}${h.locker ? '<span>🟥</span>' : ''}</div></div>
+        <div class="counter"></div><div class="vw">${Array.from({length:h.win||1}, (_,i) => `<span title="Віконце ${i+1}">🪟${i === 0 ? (lookOf(h.look).hat || '') + lookOf(h.look).e : (h.staff||[])[i-1] || ''}</span>`).join('')}${h.coffee ? '<span>☕</span>' : ''}${h.locker ? '<span>🟥</span>' : ''}</div></div>
         ${(h.badges||[]).length ? `<div>🏅 ${h.badges.join(' ')}</div>` : ''}</div>
       <div class="card kv"><span>Рівень</span><b>${p.level}</b><span>⭐ Рейтинг</span><b>${(+p.rating).toFixed(2)}</b>
       <span>📦 Посилок оброблено</span><b>${fmt(p.parcels)}</b><span>👥 Персонал</span><b>${p.staff}</b><span>🏤 Відділень</span><b>${h.branches||1}</b><span>📅 Днів</span><b>${p.days}</b></div>
