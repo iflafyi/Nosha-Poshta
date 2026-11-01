@@ -240,7 +240,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011047; // ставиться build.py
+const GAME_BUILD = 202611011052; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -415,7 +415,9 @@ const RANKS = [
   {n:'Начальник відділення', e:'🎖️', bonus:300, need:{level:10, parcels:1500, rating:4.2}},
   {n:'Регіональний керівник', e:'👑', bonus:800, need:{level:15, parcels:5000, branches:2}},
 ];
-const BRANCH_COST = [25000, 60000];
+const BRANCH_COST = [25000, 60000, 120000, 200000];
+const BRANCH_LVL = [10, 12, 15, 18];
+const brRank = n => n === 0 ? 2 : 3;
 const WALLS = {cream:['Кремові','#f1eee9',0], mint:['М’ятні','#dff2e6',300], sky:['Небесні','#e1ecfb',300], peach:['Персикові','#fbe6d6',300], lilac:['Лавандові','#ece2f7',400], brand:['Фірмові червоні','#fbdcdc',600]};
 const DECOR = {
   plant:{n:'Вазон', e:'🪴', c:400, pat:0.05}, ficus:{n:'Фікус', e:'🌿', c:700, pat:0.05}, poster:{n:'Плакат «Обережно, крихке!»', e:'🖼️', c:250, sat:0.05},
@@ -452,6 +454,67 @@ const BIZ = {
   auto:{n:'Автозапчастини «Гараж»', av:'🔧', lvl:10, items:['Запчастини','Інструменти','Шини'], q:[6,10], every:1, rate:160, d:'Щодня 6–10 важких коробок і шини.'},
 };
 const bizMax = () => 1 + G.up.tier;
+/* ---------- райони міста ---------- */
+const DISTRICTS = {
+  center:{n:'Центр', e:'🏛️', items:['Документи','Телефон','Ноутбук','Подарунок','Картина'], get:0.55, card:0.75, pat:0.85, inc:1.2, d:'Офіси та документи. Платять карткою, але поспішають.', poly:'40,70 150,55 190,120 120,165 45,140', c:'#f5cba7'},
+  sleep:{n:'Спальний район', e:'🏘️', items:['Одяг','Кросівки','Косметика','Чохол для телефону','Іграшки'], get:0.74, card:0.5, pat:1, inc:1.0, d:'Маркетплейси: багато дрібних посилок на отримання.', poly:'150,55 300,20 330,110 190,120', c:'#aed6f1'},
+  private:{n:'Приватний сектор', e:'🏡', items:['Розсада','Мед','Банки з варенням','Запчастини','Інструменти'], get:0.5, card:0.3, pat:1.25, inc:0.9, d:'Розсада, мед і запчастини. Готівка, нікуди не поспішають.', poly:'45,140 120,165 140,240 20,235', c:'#abebc6'},
+  uni:{n:'Студмістечко', e:'🎓', items:['Книжки','Одяг','Кава в зернах','Чохол для телефону'], get:0.76, card:0.7, pat:0.75, inc:0.85, d:'Передачки з дому для студентів: швидко й дешево.', poly:'120,165 190,120 260,170 230,240 140,240', c:'#d7bde2'},
+  industrial:{n:'Промзона', e:'🏭', items:['Запчастини','Шини','Інструменти','Мікрохвильовка'], get:0.45, card:0.6, pat:1, inc:1.3, d:'Великі габарити й бізнес-відправки, вищий дохід.', poly:'190,120 330,110 345,230 230,240 260,170', c:'#d5d8dc'},
+};
+const DPOS = {center:[110,110], sleep:[245,70], private:[75,195], uni:[190,195], industrial:[290,175]};
+const curDist = () => G && G.district ? DISTRICTS[G.district] : null;
+/* ---------- стрік і місячні цілі (за справжнім календарем) ---------- */
+const dkey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const MONTHS = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
+const MONTHS_N = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+const MGOALS = [
+  {k:'issued', t:'Видай {n} посилок', n:l => 150 + l*40, r:2500, g:() => G.stats.issued},
+  {k:'sent', t:'Прийми {n} відправлень', n:l => 80 + l*20, r:2500, g:() => G.stats.sent},
+  {k:'earned', t:'Зароби {n} ₴', n:l => 20000 + l*5000, r:3000, g:() => G.stats.earned},
+  {k:'days', t:'Відпрацюй {n} змін', n:() => 15, r:3000, g:() => G.day - 1},
+  {k:'fraud', t:'Викрий {n} шахраїв', n:() => 5, r:2000, g:() => G.stats.fraud || 0},
+  {k:'claims', t:'Оформи {n} актів про пошкодження', n:() => 5, r:2000, g:() => G.stats.claims || 0, lvl:2},
+  {k:'intl', t:'Прийми {n} міжнародних відправлень', n:() => 15, r:2500, g:() => G.stats.intl || 0, lvl:3},
+  {k:'biz', t:'Прийми {n} відправлень від бізнес-клієнтів', n:() => 80, r:3000, g:() => G.stats.bizSent || 0, lvl:4},
+  {k:'locker', t:'Видай {n} посилок через поштомат', n:() => 60, r:2500, g:() => G.stats.locker || 0, lvl:7},
+  {k:'cashok', t:'Звір касу без недостачі {n} разів', n:() => 8, r:2500, g:() => G.stats.cashOk || 0},
+];
+function monthState(){
+  const d = new Date(), key = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  if (!G.month || G.month.key !== key){
+    const pool = shuffle(MGOALS.filter(m => !m.lvl || G.level >= m.lvl)).slice(0, 4);
+    G.month = {key, m:d.getMonth(), goals: pool.map(m => ({k:m.k, n:m.n(G.level), r:m.r, base:m.g(), done:false})), all:false};
+  }
+  return G.month;
+}
+function checkMonth(){
+  if (!G) return;
+  const M = monthState();
+  for (const q of M.goals){
+    if (q.done) continue;
+    const def = MGOALS.find(m => m.k === q.k); if (!def) continue;
+    if (def.g() - q.base >= q.n){
+      q.done = true; G.money += q.r; G.stats.earned += q.r; addXp(Math.round(q.r/20));
+      sCash(); toast(`🗓️ Ціль місяця виконано: «${def.t.replace('{n}', fmt(q.n))}» · +${fmt(q.r)} ₴`, 'gold');
+    }
+  }
+  if (!M.all && M.goals.every(q => q.done)){
+    M.all = true; G.money += 5000; G.stats.earned += 5000; G.badges = G.badges || []; G.badges.push({e:'🗓️', t:`Усі цілі: ${MONTHS_N[M.m]}`});
+    toast('🗓️ Усі цілі місяця виконано! +5 000 ₴ і значок', 'gold');
+  }
+}
+function streakTick(){
+  const today = dkey(), y = new Date(); y.setDate(y.getDate() - 1);
+  G.streak = G.streak || {n:0, last:null, best:0};
+  if (G.streak.last === today) return null;
+  G.streak.n = G.streak.last === dkey(y) ? G.streak.n + 1 : 1;
+  G.streak.last = today; G.streak.best = Math.max(G.streak.best || 0, G.streak.n);
+  const n = G.streak.n, rew = 100 * Math.min(n, 10);
+  G.money += rew; G.stats.earned += rew; addXp(10 * Math.min(n, 10));
+  if ([7, 30, 100].includes(n)){ G.badges = G.badges || []; G.badges.push({e: n >= 100 ? '💎' : n >= 30 ? '🔥' : '📆', t:`Стрік ${n} днів поспіль`}); }
+  return {n, rew};
+}
 const TRAITS = {
   fast:{n:'⚡ Швидкі руки', d:'працює на 25% швидше'}, polite:{n:'😊 Ввічливий', d:'клієнти ставлять вищі оцінки'},
   calm:{n:'🧘 Не боїться черги', d:'майже не втомлюється від натовпу'}, careful:{n:'🎯 Уважний', d:'помиляється вдвічі рідше'},
@@ -487,7 +550,7 @@ function newGame(nick, branch){
     up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0},
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
-    season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null,
+    season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null, district:null, streak:null, month:null,
     staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
 }
 function migrate(g){
@@ -807,12 +870,13 @@ function spawnClient(force){
   const regPool = unlocked.filter(r => r.kind === 'send' || avail.some(p => p.reg === r.id));
   if (regPool.length && (Math.random() < 0.22 || regPool.some(r => r.kind==='get' && avail.some(p => p.reg===r.id) && Math.random() < 0.15))) reg = pick(regPool);
   const plain = avail.filter(p => !p.reg && !p.gift);
-  const kind = reg ? reg.kind : (plain.length && Math.random() < 0.62 ? 'get' : 'send');
+  const kind = reg ? reg.kind : (plain.length && Math.random() < (curDist() ? curDist().get : 0.62) ? 'get' : 'send');
   const pp = reg ? {name:reg.n, av:reg.av} : person();
   const c = {id:G.cid++, kind, name:pp.name, av:pp.av, reg: reg ? reg.id : null, by:null, pids:[], items:[]};
   const regMul = reg ? reg.pat : 1;
   c.max = c.pat = rnd(45, 65) * patMul() * regMul * (curSeason() ? curSeason().pat : 1);
-  c.card = reg && reg.card ? true : Math.random() < 0.5;
+  c.card = reg && reg.card ? true : Math.random() < (curDist() ? curDist().card : 0.5);
+  if (curDist()) c.max = c.pat = c.pat * curDist().pat;
   if (kind === 'get'){
     const pool = reg ? avail.filter(p => p.reg === reg.id) : plain;
     const p0 = pick(pool);
@@ -927,6 +991,7 @@ function rate(sat, c){
   if (G.insp && G.insp.state === 'on') G.insp.served++;
   G.rating = clamp(G.rating + (sat - G.rating)*0.06, 1, 5);
   G.today.served++; G.today.satSum += sat;
+  if (c && FLOW && FLOW.cid === c.id) weekServe(sat);
   if (c && c.reg){
     const info = regInfo(c.reg); info.visits++;
     if (sat >= 4) info.hearts = Math.min(5, info.hearts + 1);
@@ -1078,18 +1143,18 @@ function placeParcel(p, cell, byStaff){
 }
 
 /* ---------- кілька відділень ---------- */
-const BR_KEYS = ['branch','city','parcels','nid','queue','cid','truck','trucksDone','hand','up','staff','cand','candDay','sid','regs','rating','dirt','decor'];
+const BR_KEYS = ['branch','city','district','parcels','nid','queue','cid','truck','trucksDone','hand','up','staff','cand','candDay','sid','regs','rating','dirt','decor','biz'];
 function branchSnap(){ const o = {}; for (const k of BR_KEYS) o[k] = G[k]; return JSON.parse(JSON.stringify(o)); }
-function newBranchState(name, city){
+function newBranchState(name, city, dist){
   const d = newGame(G.nick, name); const o = {};
   for (const k of BR_KEYS) o[k] = d[k];
-  o.city = city; o.branch = name; o.money = undefined; return o;
+  o.city = city; o.branch = name; o.district = dist; o.money = undefined; return o;
 }
 function switchBranch(i){
   if (G.phase !== 'night') return toast('Перемикатись між відділеннями можна вночі', 'bad');
   const other = G.others[i]; if (!other) return;
   const cur = branchSnap();
-  for (const k of BR_KEYS) if (other[k] !== undefined) G[k] = other[k];
+  for (const k of BR_KEYS) G[k] = other[k] !== undefined ? other[k] : k === 'biz' ? {} : k === 'district' ? null : G[k];
   G.others[i] = cur;
   FLOW = null; closeModal(); save(); cloudSave(true);
   toast(`🏤 Ви тепер у відділенні «${esc(G.branch)}» (${esc(G.city)})`, 'good'); dirty = true;
@@ -1097,10 +1162,14 @@ function switchBranch(i){
 function buyBranch(){
   const n = G.others.length, cost = BRANCH_COST[n];
   if (cost === undefined) return;
-  if (G.rank < 2 + n) return toast('Потрібна вища посада', 'bad');
+  if (G.rank < brRank(n)) return toast('Потрібна вища посада', 'bad');
+  if (G.level < BRANCH_LVL[n]) return toast(`Потрібен рівень ${BRANCH_LVL[n]}`, 'bad');
   if (G.money < cost) return toast('Не вистачає грошей', 'bad');
-  const city = $('#brcity').value, name = ($('#brnew').value || '').trim().slice(0,40) || `Відділення в м. ${city}`;
-  G.money -= cost; G.others.push(newBranchState(name, city));
+  const city = $('#brcity').value, dist = NET.newDist;
+  if (!dist) return toast('Обери район на карті', 'bad');
+  if ([{city:G.city, district:G.district}, ...G.others].some(b => b.city === city && b.district === dist)) return toast('У цьому районі вже є ваше відділення', 'bad');
+  const name = ($('#brnew').value || '').trim().slice(0,40) || `Відділення ${G.others.length + 2}, ${DISTRICTS[dist].n.toLowerCase()}`;
+  G.money -= cost; G.others.push(newBranchState(name, city, dist));
   sCash(); closeModal(); toast(`🎉 Відкрито нове відділення: ${esc(name)}! Найміть туди персонал — перемкніться на нього вночі.`, 'gold');
   save(); dirty = true;
 }
@@ -1117,7 +1186,7 @@ function simOthers(){
       s.fat = Math.min(100, (s.fat||0) + 25); s.mood = clamp((s.mood ?? 80) - 5, 0, 100); s.fat = Math.max(0, s.fat - 20);
     }
     const front = (b.staff||[]).some(s => s.role === 'issue' || s.role === 'accept');
-    inc = Math.round(inc * (b.rating/4) * (1 + (b.up.tier||0)*0.3) * (1 + (b.up.ads||0)*0.1) * (front ? 1 : 0.3));
+    inc = Math.round(inc * (b.rating/4) * (1 + (b.up.tier||0)*0.3) * (1 + (b.up.ads||0)*0.1) * (front ? 1 : 0.3) * ((DISTRICTS[b.district] || {inc:1}).inc));
     b.rating = clamp(b.rating + (work ? (3.4 + lv/work*0.3 - b.rating)*0.15 : -0.08), 1, 5);
     G.money += inc - sal; if (inc > 0) G.stats.earned += inc;
     G.stats.issued += Math.round(inc/40);
@@ -1193,6 +1262,8 @@ function cleanHall(){
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null; pullGifts();
   G.season = seasonNow();
+  const stk = streakTick(); if (stk) setTimeout(() => toast(`🔥 Стрік: ${stk.n} ${stk.n === 1 ? 'день' : 'дн.'} поспіль! +${fmt(stk.rew)} ₴`, 'gold'), 2200);
+  monthState();
   G.bizToday = Object.keys(G.biz || {}).filter(id => BIZ[id] && (G.day - G.biz[id].since) % BIZ[id].every === 0).map(id => ({id, at: ri(600, 960), done:false}));
   rollDay(); genTasks();
   const se = curSeason(); if (se) setTimeout(() => toast(`${se.e} ${se.n}! ${se.d}`, 'gold'), 1400);
@@ -1239,7 +1310,7 @@ function endDay(){
   const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length, peakBonus, season:G.season};
   G.ev = null; G.eve = false; G.outage = null; G.insp = null;
   G.day++; G.phase = 'night'; G.time = 480;
-  refreshCand(); checkAch();
+  refreshCand(); checkAch(); checkMonth();
   if (sum.cashIn > 0){
     G.cashChk = makeCashCheck(sum.cashIn, sum.short || 0);
     CASH_SUM = sum; save(); cloudSave(true); showCashCheck();
@@ -1681,12 +1752,21 @@ function viewCareer(){
   const tasksH = `<div class="card"><h3>🎯 Завдання на сьогодні</h3>${G.phase === 'night' && !G.tasks.length ? '<div class="mute">Завдання з’являться, коли відкриєш відділення.</div>' :
     G.tasks.map(t => `<div class="task ${t.done?'done':''}"><div style="flex:1">${t.done?'✅':'🎯'} ${taskText(t)}<div class="lvl"><i class="on" style="flex:none;width:${Math.min(100, t.prog/t.n*100)}%"></i></div></div><b>${fmt(t.r)} ₴</b></div>`).join('')}
     ${G.phase === 'night' && G.tasks.length ? '<div class="mute">Нові завдання будуть зранку.</div>' : ''}</div>`;
-  const nb = BRANCH_COST[G.others.length];
-  const brH = `<div class="card"><h3>🏤 Мої відділення</h3>
-    <div class="task"><div style="flex:1"><b>${esc(G.branch)}</b> <span class="mute">(${esc(G.city)}) · зараз тут</span></div><span>⭐ ${G.rating.toFixed(2)}</span></div>
-    ${G.others.map((b,i) => `<div class="task"><div style="flex:1"><b>${esc(b.branch)}</b> <span class="mute">(${esc(b.city)}) · персонал: ${(b.staff||[]).length}</span></div><span>⭐ ${b.rating.toFixed(2)}</span> <button class="sm" data-act="switchbr" data-id="${i}" ${G.phase!=='night'?'disabled':''}>Перейти</button></div>`).join('')}
+  const nO = G.others.length, nb = BRANCH_COST[nO], dn = d => DISTRICTS[d] ? `${DISTRICTS[d].e} ${DISTRICTS[d].n}` : 'район не обрано';
+  const canBr = nb !== undefined && G.rank >= brRank(nO) && G.level >= BRANCH_LVL[nO];
+  const brH = `<div class="card"><h3>🗺️ Мережа відділень</h3>
+    ${cityMap(G.district ? '' : 'setdist', null)}
+    ${!G.district ? '<div class="banner ev">📍 Обери район, де стоїть твоє головне відділення — натисни на карту. Від району залежать клієнти: центр — документи й картки, спальний — маркетплейси, приватний сектор — розсада й готівка, студмістечко — передачки, промзона — габарити.</div>' : ''}
+    <div class="task"><div style="flex:1"><b>${esc(G.branch)}</b> <span class="mute">(${esc(G.city)}, ${dn(G.district)}) · зараз тут</span></div><span>⭐ ${G.rating.toFixed(2)}</span></div>
+    ${G.others.map((b,i) => `<div class="task"><div style="flex:1"><b>${esc(b.branch)}</b> <span class="mute">(${esc(b.city)}, ${dn(b.district)}) · персонал: ${(b.staff||[]).length}</span></div><span>⭐ ${b.rating.toFixed(2)}</span> <button class="sm" data-act="switchbr" data-id="${i}" ${G.phase!=='night'?'disabled':''}>Перейти</button></div>`).join('')}
     <div class="mute" style="margin-top:6px">Відділення, де вас немає, працюють самі — на найнятому там персоналі (потрібні люди на видачі). Перемикатись можна вночі. Гроші, рівень і кар’єра спільні.</div>
-    ${nb !== undefined ? `<button style="margin-top:8px" class="${G.rank >= 2 + G.others.length && G.money >= nb ? 'ok' : ''}" data-act="newbranch" ${G.rank < 2 + G.others.length ? 'disabled' : ''}>${G.rank < 2 + G.others.length ? `🔒 Потрібна посада «${RANKS[2 + G.others.length].n}»` : `➕ Відкрити ${G.others.length ? 'третє' : 'друге'} відділення · ${fmt(nb)} ₴`}</button>` : ''}</div>`;
+    ${nb !== undefined ? `<button style="margin-top:8px" class="${canBr && G.money >= nb ? 'ok' : ''}" data-act="newbranch" ${canBr ? '' : 'disabled'}>${G.rank < brRank(nO) ? `🔒 Потрібна посада «${RANKS[brRank(nO)].n}»` : G.level < BRANCH_LVL[nO] ? `🔒 Потрібен рівень ${BRANCH_LVL[nO]}` : `➕ Відкрити відділення №${nO + 2} · ${fmt(nb)} ₴`}</button>` : '<div class="mute">🏆 У вас максимум відділень.</div>'}</div>`;
+  const M = monthState(), sk = G.streak || {n:0};
+  const strH = `<div class="card"><h3>🔥 Стрік і цілі місяця</h3>
+    <div class="row"><span style="font-size:30px">${sk.n >= 30 ? '🔥' : sk.n >= 7 ? '📆' : '🗓️'}</span><div style="flex:1"><b>${sk.n || 0} ${sk.n === 1 ? 'день' : sk.n >= 2 && sk.n <= 4 ? 'дні' : 'днів'} поспіль</b><div class="mute">Відкривай відділення щодня (за справжнім календарем): бонус ${fmt(100 * Math.min((sk.n||0) + 1, 10))} ₴ за наступний день, на 7, 30 і 100 днів — значок. Рекорд: ${sk.best || 0}.</div></div></div>
+    <div class="mute" style="margin:8px 0 4px"><b>${MONTHS_N[M.m]}</b> — цілі місяця (нагороди ${fmt(M.goals.reduce((a,q) => a + q.r, 0))} ₴ + 5 000 ₴ і значок за всі):</div>
+    ${M.goals.map(q => { const def = MGOALS.find(m => m.k === q.k); const pr = Math.min(q.n, def.g() - q.base);
+      return `<div class="task ${q.done?'done':''}"><div style="flex:1">${q.done?'✅':'🗓️'} ${def.t.replace('{n}', fmt(q.n))}<div class="lvl"><i class="on" style="flex:none;width:${Math.min(100, pr/q.n*100)}%"></i></div><span class="mute">${fmt(Math.max(0, pr))}/${fmt(q.n)}</span></div><b>${fmt(q.r)} ₴</b></div>`; }).join('')}</div>`;
   const achH = `<div class="card"><h3>🏆 Досягнення</h3><div class="achs">${ACH.map(a => {
       const tier = G.ach[a.k] || 0, v = a.g(), nxt = a.t[tier];
       return `<div class="ach ${tier?'got':''}"><div class="ae">${a.e}</div><b>${a.n}</b><div class="stars">${'★'.repeat(tier)}${'☆'.repeat(a.t.length - tier)}</div><div class="mute">${a.d}: ${fmt(v)}${nxt !== undefined ? ' / ' + fmt(nxt) : ' ✅'}</div></div>`; }).join('')}</div>
@@ -1697,21 +1777,38 @@ function viewCareer(){
     ${Object.entries(BIZ).map(([k,b]) => { const on = G.biz[k];
       return `<div class="task"><span style="font-size:24px">${b.av}</span><div style="flex:1"><b>${b.n}</b><div class="mute">${b.d} Тариф ${b.rate} ₴/шт${on ? ` · ✅ діє з дня ${on.since}${on.strikes ? ` · ⚠ скарг ${on.strikes}/3` : ''}` : ''}</div></div>
         ${on ? `<button class="sm ghost" data-act="bizend" data-k="${k}">Розірвати</button>` : G.level < b.lvl ? `<span class="mute">🔒 рів. ${b.lvl}</span>` : `<button class="sm ok" data-act="bizsign" data-k="${k}" ${bizN >= bizMax() ? 'disabled' : ''}>Підписати</button>`}</div>`; }).join('')}</div>`;
-  return rankH + tasksH + bizH + brH + achH;
+  return rankH + strH + tasksH + bizH + brH + achH;
+}
+function cityMap(pickAct, sel){
+  const all = [{branch:G.branch, city:G.city, district:G.district, rating:G.rating, cur:1}, ...G.others];
+  const marks = {};
+  all.forEach(b => { if (b.district) (marks[b.district] = marks[b.district] || []).push(b); });
+  return `<svg viewBox="0 0 360 260" class="citymap" style="width:100%;max-width:520px;display:block;margin:6px auto">
+    <rect x="0" y="0" width="360" height="260" rx="14" fill="#e8f4f8"/>
+    <path d="M0,150 C80,160 120,250 200,255 L0,260 Z" fill="#aed6f1" opacity=".5"/>
+    ${Object.entries(DISTRICTS).map(([k,d]) => `<polygon points="${d.poly}" fill="${d.c}" stroke="${sel === k ? '#d7262b' : '#fff'}" stroke-width="${sel === k ? 4 : 2}" ${pickAct ? `data-act="${pickAct}" data-k="${k}" style="cursor:pointer"` : ''}/>`).join('')}
+    <path d="M20,120 L345,95 M120,20 L170,250 M60,230 L330,40" stroke="#fff" stroke-width="5" opacity=".8" fill="none" pointer-events="none"/>
+    ${Object.entries(DISTRICTS).map(([k,d]) => { const [x,y] = DPOS[k], m = marks[k] || [];
+      return `<g pointer-events="none"><text x="${x}" y="${y - 6}" text-anchor="middle" font-size="22">${d.e}</text><text x="${x}" y="${y + 12}" text-anchor="middle" font-size="11" font-weight="700" fill="#333">${d.n}</text>
+        ${m.map((b,i) => `<g transform="translate(${x - 14 + i*18},${y + 18})"><circle r="9" fill="${b.cur ? '#d7262b' : '#1f3a5f'}"/><text y="4" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">НП</text></g>`).join('')}</g>`; }).join('')}
+  </svg>`;
 }
 function showNewBranch(){
-  const used = [G.city, ...G.others.map(b => b.city)];
-  showModal('🏤 Нове відділення', `<p>Оберіть місто і назву нового відділення.</p>
-    <select id="brcity">${CITIES.filter(c => !used.includes(c)).map(c => `<option>${c}</option>`).join('')}</select>
+  const n = G.others.length;
+  const dist = NET.newDist ? DISTRICTS[NET.newDist] : null;
+  showModal('🏤 Нове відділення', `<p>Обери район на карті — від нього залежить, які клієнти приходитимуть. Можна відкрити відділення в тому ж місті або в іншому.</p>
+    ${cityMap('pickdist', NET.newDist)}
+    <div class="card">${dist ? `<b>${dist.e} ${dist.n}</b><div class="mute">${dist.d} Дохід ×${dist.inc}</div>` : '<span class="mute">👆 Натисни на район</span>'}</div>
+    <div class="mute">Місто:</div><select id="brcity">${[G.city === 'Головне' ? 'Головне' : G.city, ...CITIES.filter(c => c !== G.city)].map(c => `<option>${c}</option>`).join('')}</select>
     <input id="brnew" maxlength="40" placeholder="Назва (наприклад, Відділення №2, вул. Шевченка)" style="margin-top:8px">
-    <button class="pri" style="width:100%;margin-top:10px" data-act="buybranch">Відкрити · ${fmt(BRANCH_COST[G.others.length])} ₴</button>`);
+    <button class="pri" style="width:100%;margin-top:10px" data-act="buybranch" ${dist ? '' : 'disabled'}>Відкрити · ${fmt(BRANCH_COST[n])} ₴</button>`);
 }
 function openServe(id){
   if (G.phase !== 'day') return;
   if (FLOW){ FLOW.hidden = false; renderFlow(); return; }
   const c = G.queue.find(c => c.id === id && !c.by); if (!c) return;
   c.by = 'me';
-  FLOW = {cid:c.id, mist:0, step: c.lockfix ? 'lock' : c.biz ? 'bulk' : c.kind === 'get' ? 'phone' : itemSteps(c.items[0])[0], scanned:[], i:0, picked:[], pack:null, wrap:false, weighed:false, pay:{}, extra:0};
+  FLOW = {cid:c.id, t0:performance.now(), mist:0, step: c.lockfix ? 'lock' : c.biz ? 'bulk' : c.kind === 'get' ? 'phone' : itemSteps(c.items[0])[0], scanned:[], i:0, picked:[], pack:null, wrap:false, weighed:false, pay:{}, extra:0};
   if (c.kind === 'get') FLOW.rows = terminalRows(c);
   sBell(); dirty = true; renderFlow();
 }
@@ -2369,7 +2466,9 @@ function act(a, el){
       showModal('🎖️ Підвищення!', `<div class="bigstart"><div class="e">${RANKS[G.rank].e}</div><h2>${RANKS[G.rank].n}</h2><p>Вітаємо з новою посадою! Щоденна надбавка: <b>${fmt(RANKS[G.rank].bonus)} ₴</b>.</p>${G.rank >= 2 ? '<p>🏤 Тепер можна відкрити ще одне відділення в іншому місті (вкладка «Кар’єра»).</p>' : ''}</div><button class="pri" style="width:100%" data-act="mclose">Дякую!</button>`);
       dirty = true; return;
     }
-    case 'newbranch': return showNewBranch();
+    case 'newbranch': NET.newDist = null; return showNewBranch();
+    case 'pickdist': { const city = ($('#brcity') || {}).value, nm = ($('#brnew') || {}).value; NET.newDist = el.dataset.k; showNewBranch(); if (city) $('#brcity').value = city; if (nm) $('#brnew').value = nm; return; }
+    case 'setdist': { if (G.district) return; const k = el.dataset.k; if (!DISTRICTS[k]) return; if (!confirm(`Головне відділення буде в районі «${DISTRICTS[k].n}». Змінити потім не можна. Підтвердити?`)) return; G.district = k; save(); toast(`${DISTRICTS[k].e} Відділення тепер у районі «${DISTRICTS[k].n}»`, 'good'); dirty = true; return; }
     case 'buybranch': return buyBranch();
     case 'switchbr': return switchBranch(id);
     case 'wall': {
@@ -2490,6 +2589,7 @@ function act(a, el){
     case 'devgift': { const to = $('#devto').value || null, t = $('#devgt').value, n = Math.max(1, Math.min(999999, Math.round(+$('#devgn').value || 0)));
       devCall('np_admin_gift', {p_to:to, p_item:`dev:${t}:${n}`, p_note:$('#devgnote').value || ''}).then(r => { if (r !== null) toast(`🎁 Надіслано ${r} гравц${r === 1 ? 'ю' : 'ям'}`, 'good'); }); return; }
     case 'devchatdel': devCall('np_admin_chat_del', {p_msg:+el.dataset.id}, 'Видалено').then(() => { const m = NET.chat.find(x => x.id === +el.dataset.id); if (m) m.del = 1; drawChat(); }); return;
+    case 'wcat': NET.wcat = el.dataset.v; NET.week = null; loadWeek(); dirty = true; return;
     case 'lbsort': NET.sort = el.dataset.v; NET.top = null; loadTop(); dirty = true; return;
     case 'chatsend': return chatSend();
     case 'player': return showPlayer(el.dataset.id);
@@ -2537,13 +2637,24 @@ function isoWeek(){
 function weekParcels(){
   const tot = G.stats.issued + G.stats.sent, k = isoWeek();
   if (!G.week || G.week.k !== k) G.week = {k, base: tot};
-  return {k, n: Math.max(0, tot - G.week.base)};
+  const W = G.week;
+  return {k, n: Math.max(0, tot - W.base), clean: W.clean || 0, served: W.served || 0, sat: W.served ? +(W.satSum / W.served).toFixed(2) : 0, spd: W.spdN ? +(W.spdSum / W.spdN).toFixed(1) : 0};
 }
+// облік обслуговувань гравцем для тижневих категорій
+function weekServe(sat){
+  if (!FLOW) return;
+  weekParcels(); const W = G.week;
+  W.served = (W.served || 0) + 1; W.satSum = (W.satSum || 0) + sat;
+  if (!FLOW.mist) W.clean = (W.clean || 0) + 1;
+  const sec = Math.min(300, (performance.now() - (FLOW.t0 || performance.now())) / 1000);
+  W.spdSum = (W.spdSum || 0) + sec; W.spdN = (W.spdN || 0) + 1;
+}
+const WCATS = {parcels:['📦','Посилки','посилок за тиждень'], clean:['✅','Без помилок','обслуговувань без жодної помилки'], rating:['⭐','Оцінки','середня оцінка клієнтів (від 30 обслуговувань)'], speed:['⚡','Швидкість','середній час обслуговування, с (від 30)']};
 function hallPayload(){
   return {wall:G.decor.wall, items:Object.keys(G.decor.items||{}).slice(0,20), tier:G.up.tier, win:G.up.windows, staff:G.staff.slice(0,10).map(s => s.av),
     badges:(G.badges||[]).slice(-8).map(b => b.e), branches:1 + G.others.length, regs:Object.values(G.regs).filter(r => r.met).length, coffee:G.up.coffee, locker:G.up.locker};
 }
-function statsPayload(){ const w = weekParcels(); return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1, rank:G.rank, hall:hallPayload(), wk:w.k, wk_parcels:w.n}; }
+function statsPayload(){ const w = weekParcels(); return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1, rank:G.rank, hall:hallPayload(), wk:w.k, wk_parcels:w.n, wk_clean:w.clean, wk_served:w.served, wk_sat:w.sat, wk_spd:w.spd}; }
 async function cloudSave(force){
   if (!G || !G.pid || NET.saving || NET.expired) return false;
   // спершу перевіряємо, чи інший пристрій не зберіг новіший прогрес — щоб не перезаписати його старим
@@ -2792,10 +2903,14 @@ function viewOnline(){
     return me + sub + `<div class="card"><div class="chat" id="chatbox"></div><div class="row" style="flex-wrap:nowrap"><input id="chatin" maxlength="300" placeholder="Повідомлення…"><button class="pri" data-act="chatsend">➤</button></div></div>`;
   }
   if (NET.sub === 'week'){
-    const w = NET.week, mine = weekParcels();
-    return me + sub + `<div class="card"><h3>📅 Тижневий конкурс відділень</h3><div class="mute">Хто видасть і прийме найбільше посилок за тиждень (пн–нд), отримує нагороду: 🥇 3 000 ₴, 🥈 2 000 ₴, 🥉 1 000 ₴, 4–10 місце 300 ₴ і значок. Нагорода приходить на початку наступного тижня. Ваші посилки цього тижня: <b>${fmt(mine.n)}</b></div>
-      ${!w ? '<div class="mute" style="margin-top:8px">Завантаження…</div>' : !w.length ? '<div class="mute" style="margin-top:8px">Цього тижня ще ніхто не працював. Будь першим!</div>' :
-      `<table class="lb" style="margin-top:8px"><tr><th>#</th><th>Відділення</th><th>📦 за тиждень</th></tr>${w.map((x,i) => `<tr class="${x.player_id===G.pid?'mine':''}" data-act="player" data-id="${x.player_id}" style="cursor:pointer"><td>${['🥇','🥈','🥉'][i] || i+1}</td><td><b data-nol10n>${esc(x.nickname)}</b><div class="mute" data-nol10n>${esc(x.branch)}</div></td><td>${fmt(x.parcels)}</td></tr>`).join('')}</table>`}</div>`;
+    const w = NET.week, mine = weekParcels(), cat = NET.wcat || 'parcels', C = WCATS[cat];
+    const myV = {parcels: fmt(mine.n), clean: fmt(mine.clean), rating: mine.served ? mine.sat.toFixed(2) + ` (${mine.served} обсл.)` : '—', speed: mine.spd ? mine.spd + ' с' + (mine.served < 30 ? ` (${mine.served}/30 обсл.)` : '') : '—'}[cat];
+    const val = x => cat === 'rating' ? (+x.val).toFixed(2) + '★' : cat === 'speed' ? (+x.val).toFixed(1) + ' с' : fmt(x.val ?? x.parcels);
+    return me + sub + `<div class="card"><h3>📅 Тижневий конкурс відділень</h3>
+      <div class="row" style="margin-bottom:6px">${Object.entries(WCATS).map(([k,[e,n]]) => `<button class="sm ${cat===k?'pri':''}" data-act="wcat" data-v="${k}">${e} ${n}</button>`).join('')}</div>
+      <div class="mute">${C[0]} <b>${C[1]}</b>: ${C[2]}. Тиждень пн–нд. Нагороди: посилки — 🥇 3 000 ₴, 🥈 2 000 ₴, 🥉 1 000 ₴, 4–10 місце 300 ₴; інші категорії — 🥇 1 500 ₴, 🥈 1 000 ₴, 🥉 600 ₴, 4–10 місце 200 ₴. Призерам — значок. Нагорода приходить на початку наступного тижня.<br>Ваш результат: <b>${myV}</b></div>
+      ${!w ? '<div class="mute" style="margin-top:8px">Завантаження…</div>' : !w.length ? '<div class="mute" style="margin-top:8px">У цій категорії поки нікого. Будь першим!</div>' :
+      `<table class="lb" style="margin-top:8px"><tr><th>#</th><th>Відділення</th><th>${C[0]}</th></tr>${w.map((x,i) => `<tr class="${x.player_id===G.pid?'mine':''}" data-act="player" data-id="${x.player_id}" style="cursor:pointer"><td>${['🥇','🥈','🥉'][i] || i+1}</td><td><b data-nol10n>${esc(x.nickname)}</b><div class="mute" data-nol10n>${esc(x.branch)}</div></td><td>${val(x)}</td></tr>`).join('')}</table>`}</div>`;
   }
   if (NET.sub === 'rev'){
     const r = NET.myRev;
@@ -2969,17 +3084,24 @@ function giftResult(ps){
 }
 async function weekClaim(){
   if (!G || !G.pid) return;
+  const res = [];
   try {
-    const r = await rpc('np_week_claim', {p_id:G.pid, p_secret:G.secret});
-    if (!r || !r.place) return;
-    const pl = r.place, rew = pl === 1 ? 3000 : pl === 2 ? 2000 : pl === 3 ? 1000 : pl <= 10 ? 300 : 100;
-    const b = pl === 1 ? '🥇' : pl === 2 ? '🥈' : pl === 3 ? '🥉' : '🎖️';
-    if (pl <= 10){ G.badges = G.badges || []; G.badges.push({e:b, t:`${pl} місце тижня ${r.wk}`}); }
-    addMoney(rew); save(); cloudSave(true);
-    showModal('🏆 Підсумки тижневого конкурсу', `<div class="bigstart"><div class="e">${b}</div><h2>${pl} місце з ${r.total}</h2><p>Тиждень ${r.wk}. Нагорода: <b>${fmt(rew)} ₴</b>${pl <= 10 ? ' і значок у профілі' : ''}.</p></div><button class="pri" style="width:100%" data-act="mclose">Ура!</button>`);
+    for (let i = 0; i < 8; i++){
+      const r = await rpc('np_week_claim', {p_id:G.pid, p_secret:G.secret});
+      if (!r) break;
+      if (!r.place) continue;
+      const cat = r.cat || 'parcels', main = cat === 'parcels', pl = r.place;
+      const rew = main ? (pl === 1 ? 3000 : pl === 2 ? 2000 : pl === 3 ? 1000 : pl <= 10 ? 300 : 100) : (pl === 1 ? 1500 : pl === 2 ? 1000 : pl === 3 ? 600 : pl <= 10 ? 200 : 50);
+      const b = pl === 1 ? '🥇' : pl === 2 ? '🥈' : pl === 3 ? '🥉' : '🎖️';
+      if (pl <= (main ? 10 : 3)){ G.badges = G.badges || []; G.badges.push({e:b, t:`${pl} місце тижня ${r.wk}${main ? '' : ' · ' + WCATS[cat][1]}`}); }
+      addMoney(rew); res.push({cat, pl, total:r.total, wk:r.wk, rew, b});
+    }
   } catch(e){}
+  if (!res.length) return;
+  save(); cloudSave(true);
+  showModal('🏆 Підсумки тижневого конкурсу', `${res.map(x => `<div class="card row"><span style="font-size:32px">${x.b}</span><div style="flex:1"><b>${WCATS[x.cat][0]} ${WCATS[x.cat][1]}: ${x.pl} місце з ${x.total}</b><div class="mute">Тиждень ${x.wk}</div></div><b>+${fmt(x.rew)} ₴</b></div>`).join('')}<button class="pri" style="width:100%" data-act="mclose">Ура!</button>`);
 }
-async function loadWeek(){ try { NET.week = await rpc('np_week_top', {}); if (TAB === 'online') dirty = true; } catch(e){ NET.week = NET.week || []; } }
+async function loadWeek(){ const cat = NET.wcat || 'parcels'; try { const r = await rpc('np_week_top', {p_cat:cat}); if ((NET.wcat || 'parcels') === cat){ NET.week = r; if (TAB === 'online') dirty = true; } } catch(e){ NET.week = NET.week || []; } }
 async function loadMyReviews(){ if (!G.pid) return; try { NET.myRev = await rpc('np_reviews_for', {p_to:G.pid}); if (TAB === 'online') dirty = true; } catch(e){} }
 
 /* ---------- оновлення гри ---------- */
