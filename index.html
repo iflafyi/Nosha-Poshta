@@ -240,7 +240,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011854; // ставиться build.py
+const GAME_BUILD = 202611011858; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -273,9 +273,9 @@ const ITEMS = [
   {n:'Розсада', e:'🌱', s:2, w:[1,3], f:1},
   {n:'Мед', e:'🍯', s:1, w:[1,3], f:1},
   {n:'Запчастини', e:'⚙️', s:3, w:[5,15], v:[1000,8000]},
-  {n:'Шини', e:'🛞', s:4, w:[20,40], packed:1, v:[4000,16000]},
+  {n:'Шини', e:'🛞', s:4, w:[20,40], v:[4000,16000], dims:[70,70,90]},
   {n:'Мікрохвильовка', e:'📦', s:3, w:[10,14], f:1, packed:1, v:[2000,5000]},
-  {n:'Велосипед', e:'🚲', s:4, w:[12,18], packed:1, v:[5000,20000]},
+  {n:'Велосипед', e:'🚲', s:4, w:[12,18], packed:1, v:[5000,20000], dims:[150,25,80]},
   {n:'Косметика', e:'💄', s:1, w:[0.3,1], f:1},
   {n:'Посуд', e:'🍽️', s:2, w:[2,6], f:1},
   {n:'Інструменти', e:'🔧', s:3, w:[4,10], v:[800,5000]},
@@ -287,8 +287,12 @@ const ITEMS = [
   {n:'Квіти', e:'💐', s:2, w:[0.5,2], f:1, ev:1},
   {n:'Ялинкові іграшки', e:'🎄', s:1, w:[0.3,1.5], f:1, ev:1},
   {n:'Шоколад', e:'🍫', s:0, w:[0.1,0.5], ev:1},
+  {n:'Диван', e:'🛋️', s:4, w:[30,55], dims:[200,90,80], big:1},
+  {n:'Холодильник', e:'🧊', s:4, w:[40,70], f:1, dims:[180,60,65], big:1},
+  {n:'Пральна машина', e:'🌀', s:4, w:[50,70], f:1, dims:[85,60,60], big:1},
 ];
-const BASE_ITEMS = ITEMS.filter(i => !i.ev);
+const BASE_ITEMS = ITEMS.filter(i => !i.ev && !i.big);
+const BIG_ITEMS = ITEMS.filter(i => i.dims);
 /* ---------- події дня ---------- */
 const EVENTS = {
   sale:{n:'Розпродаж на маркетплейсі', e:'🏷️', flow:1.3, truck:1.35, extra:1, items:['Одяг','Кросівки','Косметика','Чохол для телефону'], d:'Інтернет-магазини влаштували знижки — посилок більше, приїде додаткова машина.'},
@@ -376,6 +380,25 @@ const INTL_OK = ['Одяг','Книжки','Кросівки','Іграшки','
 const intlPrice = w => 300 + Math.round(110*w);
 const codFee = v => v ? 20 + Math.round(v*0.02) : 0;   // комісія за післяплату
 const CASH_FLOAT = 500;                                   // розмінні гроші в касі зранку
+/* ---------- негабарит ---------- */
+const isBig = it => it.s >= 4 && !it.intl && !!it.dims;
+const volW = it => it.dims ? +(it.dims[0]*it.dims[1]*it.dims[2]/4000).toFixed(1) : 0;
+const billW = it => isBig(it) ? Math.max(it.w, volW(it)) : it.w;
+const bigPrice = bw => 150 + Math.round(4*bw);
+const BIGPACK = [{k:'stretch', n:'🎞️ Стретч-плівка + кутики', price:80}, {k:'crate', n:'🪵 Дерев’яна обрешітка', price:250}, {k:'own', n:'🏷️ Вже запаковано', price:0}];
+const bigPackRight = it => it.f ? 'crate' : it.packed ? 'own' : 'stretch';
+const itemBase = it => it.intl ? intlPrice(it.w) : isBig(it) ? bigPrice(billW(it)) : sendPrice(it.w, it.f);
+/* ---------- вітрина, план продажів, витратні матеріали ---------- */
+const SHOP = {
+  box:{n:'Коробка M', e:'📦', p:40, c:20}, tape:{n:'Скотч', e:'🧻', p:35, c:15}, wrap:{n:'Пухирцева плівка, 1 м', e:'🫧', p:25, c:10},
+  env:{n:'Конверт A4', e:'✉️', p:15, c:5}, card:{n:'Листівка', e:'💌', p:30, c:12}, pen:{n:'Ручка', e:'🖊️', p:20, c:7},
+};
+const PLAN_G = {
+  shop:{t:'Продажі з вітрини й допродажі', u:'₴', n:l => 500 + l*90},
+  pack:{t:'Продаж пакування', u:'₴', n:l => 700 + l*110},
+  ins:{t:'Відправлення з оголошеною вартістю', u:'шт', n:l => 4 + Math.round(l*0.8)},
+};
+const ROLL = 100, ROLL_COST = 120, ROLL_RUSH = 300;
 
 /* ---------- розвиток: завдання, досягнення, кар'єра, оформлення, риси ---------- */
 const TASK_T = [
@@ -554,6 +577,7 @@ function newGame(nick, branch){
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
     season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null, district:null, streak:null, month:null, expect:[],
+    sup:{rolls:2, lbl:ROLL, bat:100, chg:0}, shopStock:{box:6, tape:6, wrap:6, env:6, card:6, pen:6}, plan:null, inv:null,
     staff:[], cand:[], candDay:0, sid:1, regs:{}, today:blankToday(), settings:{sound:true, speed:1}, savedAt:0, seenGuide:false};
 }
 function migrate(g){
@@ -762,10 +786,11 @@ function scanStart(el){
   if (SCAN.el === el) return;
   scanStop();
   SCAN.el = el; el.classList.add('scanning');
-  const ms = (G && G.up.scanner >= 1) ? 280 : 380;
+  const ms = ((G && G.up.scanner >= 1) ? 280 : 380) * (scanSlow() ? 3 : 1);
   SCAN.t = setTimeout(() => {
     const e = SCAN.el; scanStop(); if (!e || !e.isConnected) return;
     e.classList.add('scanned'); sScan(); SCAN.last = performance.now();
+    if (G && G.phase === 'day' && !manualMode() && G.sup.bat > 0){ G.sup.bat -= 0.6; if (G.sup.bat <= 0){ G.sup.bat = 0; toast('🪫 Сканер розрядився — номери вводиш вручну. Постав його на зарядку в 🧰', 'bad'); } else if (G.sup.bat < 15 && !G.sup.lowBat){ G.sup.lowBat = 1; toast('🔋 Сканер майже розряджений!'); } }
     act(e.dataset.scan, e);
   }, ms);
 }
@@ -890,6 +915,16 @@ function spawnClient(force){
     c.max = c.pat = rnd(40, 55) * patMul();
     G.queue.push(c); G.stats.clients++; dirty = true; return;
   }
+  // покупець з вітрини
+  const inStock = Object.keys(SHOP).filter(k => (G.shopStock || {})[k] > 0);
+  if (G.level >= 2 && inStock.length && !G.queue.some(c => c.kind === 'shop') && Math.random() < 0.07){
+    const pp = person(), buy = shuffle(inStock).slice(0, ri(1, Math.min(3, inStock.length))).map(k => ({k, q: Math.min(G.shopStock[k], pick([1,1,2,3]))}));
+    const say = buy.map(b => `${b.q > 1 ? b.q + ' × ' : ''}${SHOP[b.k].n.toLowerCase()}`).join(', ');
+    const c = {id:G.cid++, kind:'shop', name:pp.name, av:pp.av, reg:null, by:null, pids:[], items:[], buy, card: Math.random() < (curDist() ? curDist().card : 0.5),
+      hi: `${pick(['Добрий день! Мені, будь ласка:','Вітаю! Продайте мені:','Здрастуйте, мені треба:'])} <b>${say}</b>.`};
+    c.max = c.pat = rnd(40, 55) * patMul();
+    G.queue.push(c); G.stats.clients++; dirty = true; return;
+  }
   const unlocked = REGS.filter(r => G.level >= r.lvl && !G.queue.some(c => c.reg === r.id));
   let reg = null;
   const regPool = unlocked.filter(r => r.kind === 'send' || avail.some(p => p.reg === r.id));
@@ -924,8 +959,9 @@ function spawnClient(force){
     for (let i=0;i<n;i++){
       let it;
       if (intl) it = Math.random() < 0.4 ? pick(BAN_ITEMS) : ITEM(pick(INTL_OK));
-      else it = reg ? ITEM(pick(reg.items)) : pickItem();
+      else it = reg ? ITEM(pick(reg.items)) : (G.level >= 4 && n === 1 && Math.random() < 0.08) ? pick(BIG_ITEMS) : pickItem();
       const x = {item:it.n, e:it.e, s:it.s, f:it.f?1:0, packed:it.packed?1:0, w:+rnd(it.w[0], it.w[1]).toFixed(1), city:pick(CITIES), val: it.v ? Math.round(rnd(it.v[0], it.v[1])/100)*100 : 0};
+      if (it.dims && !intl) x.dims = it.dims.map(d => Math.round(d * rnd(0.9, 1.1)));
       if (intl){ x.intl = intl; x.city = intl; if (it.why){ x.ban = 1; x.why = it.why; } x.val = x.val || ri(3,30)*100; }
       else if (seller && Math.random() < 0.8) x.cod = ri(4,60)*25;
       c.items.push(x);
@@ -1101,8 +1137,15 @@ function staffTick(dt){
 function staffFinish(s, forceErr){
   const c = G.queue.find(c => c.id === s.cl); s.cl = null; s.t = 0;
   if (!c) return 0;
-  const err = forceErr !== undefined ? forceErr : Math.random() < errCh(s);
+  let err = forceErr !== undefined ? forceErr : Math.random() < errCh(s);
   let money = 0, n = 0, codCash = 0;
+  if (c.kind === 'shop'){
+    for (const b of c.buy){ const q = Math.min(b.q, (G.shopStock||{})[b.k] || 0); G.shopStock[b.k] -= q; money += q * SHOP[b.k].p; }
+    planAdd('shop', money);
+    if (!c.card || manualMode()) G.today.cashIn += money;
+    removeClient(c); rate(err ? 2 : 4, c); addMoney(money); addXp(4);
+    return money;
+  }
   if (c.kind === 'info'){
     if (!err && c.track.st === 'road') (G.expect = G.expect || []).push({phone:phone(), name:c.name});
     removeClient(c); rate(err ? 2 : 4, c); addXp(3); countTask('track', 1);
@@ -1130,12 +1173,15 @@ function staffFinish(s, forceErr){
       if (c.biz){ const p = makeParcel({item:{n:it.item, e:it.e, s:it.s, w:[it.w,it.w], f:it.f}, state:'outgoing'}); p.city = it.city; p.cod = 0; n++; continue; }
       if (it.ban && !err) continue; // працівник не прийняв заборонене
       const pk = PACK.find(x => x.k === (it.packed ? 9 : it.s)) || PACK[0];
-      money += (it.intl ? intlPrice(it.w) : sendPrice(it.w, it.f) + valFee(it.val)) + (it.s >= 4 ? 0 : pk.price) + codFee(it.cod);
+      const pp = isBig(it) ? BIGPACK.find(b => b.k === bigPackRight(it)).price : it.s >= 4 ? 0 : pk.price;
+      money += itemBase(it) + (it.intl ? 0 : valFee(it.val)) + pp + codFee(it.cod);
+      planAdd('pack', pp); if (it.val && !it.intl) planAdd('ins', 1);
       const p = makeParcel({item:{n:it.item, e:it.e, s:it.s, w:[it.w,it.w], f:it.f}, state:'outgoing'}); p.w = it.w; p.city = it.city; p.intl = it.intl || null; p.cod = 0;
       n++;
     }
     G.stats.sent += n; G.today.sent += n;
     if (!n){ removeClient(c); addXp(3); return; }
+    if (!labelsUse(n, true)){ err = true; toast(`🧾 ${esc(s.name)}: закінчилась термострічка — ТТН виписано від руки`, 'bad'); }
   }
   if (!c.biz && (!c.card || manualMode())){
     const cash = c.kind === 'get' ? codCash + (c.redir && c.redir.type !== 'back' ? REDIR_FEE : 0) : money;
@@ -1166,6 +1212,42 @@ function storeAction(s){
   if (Math.random() < 0.5 && lockerLoadOne()){ dirty = true; return; }
   if (G.dirt > 0) G.dirt = Math.max(0, G.dirt - 4); // вільна хвилинка — прибирає зал
 }
+/* ---------- витратні матеріали і план ---------- */
+function planAdd(k, n){ if (G.plan && !G.plan.done && n) { G.plan.prog[k] = (G.plan.prog[k]||0) + n; } }
+function labelsUse(n, auto){
+  const S = G.sup; if (manualMode()) return true;
+  if (S.lbl < n && auto && S.rolls > 0){ S.rolls--; S.lbl += ROLL; }
+  if (S.lbl < n) return false;
+  S.lbl -= n; if (S.lbl <= 10 && !S.rolls && !S.warned){ S.warned = 1; toast('🧾 Термострічка майже закінчилась, а запасних рулонів немає! Купи в 🧰 Матеріалах', 'bad'); }
+  return true;
+}
+// перед друком: зажувало / закінчилась стрічка
+function printGuard(n){
+  if (manualMode()) return true;
+  if (G.sup.lbl < n){ FLOW.needRoll = true; sErr(); renderFlow(); return false; }
+  if (Math.random() < 0.05){ FLOW.jam = true; G.sup.lbl = Math.max(0, G.sup.lbl - 1); sErr(); renderFlow(); return false; }
+  labelsUse(n); return true;
+}
+function supplyHTML(c){
+  const S = G.sup;
+  if (FLOW.jam) return speaker(c, 'Ой, щось ваш принтер не хоче друкувати…') + `<div class="opened">🖨️💢</div><div class="terminal">🖨️ Принтер зажував етикетку! Відкрий кришку, витягни зім’яту стрічку й передрукуй.</div>
+    <button class="pri" style="width:100%" data-act="fixjam">🔧 Витягти етикетку і передрукувати</button>`;
+  return speaker(c, 'Щось довго…') + `<div class="opened">🧾❌</div><div class="terminal">🖨️ Закінчилась термострічка! Запасних рулонів: <b>${S.rolls}</b></div>
+    ${S.rolls > 0 ? '<button class="pri" style="width:100%" data-act="newroll">🧾 Поставити новий рулон</button>'
+      : `<div class="mute" style="margin-bottom:6px">Рулонів немає. Купуй їх заздалегідь у «🧰 Матеріалах».</div><button class="pri" style="width:100%" data-act="rushroll">🚕 Термінова доставка рулону · ${ROLL_RUSH} ₴, −20 хв</button>`}`;
+}
+function scanSlow(){ return G && G.phase === 'day' && !manualMode() && (G.sup.bat <= 0 || G.sup.chg > G.time); }
+function showSupplies(){
+  const S = G.sup, st = G.shopStock || {}, day = G.phase === 'day';
+  const chg = S.chg > G.time;
+  showModal('🧰 Матеріали', `<div class="card"><h3>🧾 Термострічка для ТТН</h3><div class="mute">У принтері: <b>${S.lbl}</b> етикеток · запасних рулонів: <b>${S.rolls}</b> (по ${ROLL})</div>
+      <div class="row" style="margin-top:6px"><button class="sm ok" data-act="buyroll" data-v="1" ${G.money < ROLL_COST ? 'disabled' : ''}>+1 рулон · ${ROLL_COST} ₴</button><button class="sm" data-act="buyroll" data-v="5" ${G.money < ROLL_COST*5 ? 'disabled' : ''}>+5 рулонів · ${fmt(ROLL_COST*5)} ₴</button></div></div>
+    <div class="card"><h3>🔋 Сканер</h3><div class="lvl"><i class="on" style="flex:none;width:${Math.max(0, S.bat)}%;background:${S.bat < 20 ? 'var(--red)' : S.bat < 50 ? 'var(--amber)' : 'var(--green)'}"></i></div>
+      <div class="mute" style="margin:6px 0">${chg ? `🔌 Заряджається до ${hhmm(S.chg)} — поки що номери вводиш вручну (повільно)` : S.bat <= 0 ? '🪫 Розряджений! Номери вводиш вручну — сканування втричі повільніше.' : `Заряд ${Math.round(S.bat)}%. Кожен «пік» трохи розряджає. Вночі заряджається сам.`}</div>
+      ${day && !chg && S.bat < 100 ? '<button class="sm" data-act="charge">🔌 Поставити на зарядку (25 хв)</button>' : ''}</div>
+    <div class="card"><h3>🛍️ Вітрина</h3><div class="mute">Клієнти купують товари з вітрини, а ти можеш пропонувати їх під час оплати відправлення (план продажів!). Закупівля — по 10 шт.</div>
+      ${Object.entries(SHOP).map(([k,x]) => `<div class="task"><span style="font-size:22px">${x.e}</span><div style="flex:1"><b>${x.n}</b><div class="mute">ціна ${x.p} ₴ · на вітрині: ${st[k]||0}</div></div><button class="sm" data-act="restock" data-k="${k}" ${G.money < x.c*10 ? 'disabled' : ''}>+10 · ${x.c*10} ₴</button></div>`).join('')}</div>`);
+}
 function misOut(p){
   p.state = 'outgoing'; p.city = p.mis.city; p.misOut = 1; p.cell = null; p.target = null;
   if (G.hand === p.id) G.hand = null;
@@ -1187,7 +1269,7 @@ function placeParcel(p, cell, byStaff){
 }
 
 /* ---------- кілька відділень ---------- */
-const BR_KEYS = ['branch','city','district','parcels','nid','queue','cid','truck','trucksDone','hand','up','staff','cand','candDay','sid','regs','rating','dirt','decor','biz'];
+const BR_KEYS = ['branch','city','district','parcels','nid','queue','cid','truck','trucksDone','hand','up','staff','cand','candDay','sid','regs','rating','dirt','decor','biz','sup','shopStock','inv'];
 function branchSnap(){ const o = {}; for (const k of BR_KEYS) o[k] = G[k]; return JSON.parse(JSON.stringify(o)); }
 function newBranchState(name, city, dist){
   const d = newGame(G.nick, name); const o = {};
@@ -1302,6 +1384,65 @@ function cleanHall(){
   G.time += 10; G.dirt = 0; beep(300, 0.2, 'triangle', 0.04); toast('🧹 Зал прибрано (−10 хв)', 'good'); dirty = true;
 }
 
+/* ---------- тижневий план продажів ---------- */
+function planTick(){
+  if (G.level < 2) return;
+  const P = G.plan;
+  if (P && !P.done && G.day > P.end){
+    P.done = true;
+    const res = Object.entries(P.goals).map(([k,n]) => ({k, n, v:P.prog[k]||0, ok:(P.prog[k]||0) >= n}));
+    const okN = res.filter(r => r.ok).length; let money = okN*400;
+    if (okN === res.length){ money += 1500; G.badges = G.badges || []; G.badges.push({e:'📈', t:`План тижня виконано (дні ${P.start}–${P.end})`}); }
+    if (!okN) G.rating = clamp(G.rating - 0.05, 1, 5);
+    G.money += money; if (money) G.stats.earned += money;
+    setTimeout(() => showModal('📈 Підсумки плану продажів', `<p>Регіональний менеджер підбив підсумки тижня:</p>
+      ${res.map(r => `<div class="task ${r.ok?'done':''}"><div style="flex:1">${r.ok?'✅':'❌'} ${PLAN_G[r.k].t}<div class="lvl"><i class="on" style="flex:none;width:${Math.min(100, r.v/r.n*100)}%"></i></div></div><b>${fmt(r.v)}/${fmt(r.n)} ${PLAN_G[r.k].u}</b></div>`).join('')}
+      <p>${okN === res.length ? `🎉 План виконано повністю! Премія <b>${fmt(money)} ₴</b> і значок 📈` : okN ? `Виконано ${okN} з ${res.length}: премія <b>${fmt(money)} ₴</b>` : '😬 План провалено — рейтинг відділення знижено.'}</p>
+      <button class="pri" style="width:100%" data-act="mclose">Новий план на тиждень ➜</button>`), 900);
+  }
+  if (!G.plan || G.plan.done) G.plan = {start:G.day, end:G.day + 6, goals:Object.fromEntries(Object.entries(PLAN_G).map(([k,g]) => [k, g.n(G.level)])), prog:{}, done:false};
+}
+function planCard(){
+  const P = G.plan; if (!P) return G.level < 2 ? '' : '<div class="card"><h3>📈 План продажів</h3><div class="mute">План на тиждень з’явиться, коли відкриєш відділення.</div></div>';
+  return `<div class="card"><h3>📈 План продажів <span class="mute">(дні ${P.start}–${P.end})</span></h3><div class="mute">Регіональний менеджер чекає продажів: пропонуй товари з вітрини під час оплати, продавай пакування і страхуй цінне. За кожну ціль +400 ₴, за весь план ще +1 500 ₴ і значок.</div>
+    ${Object.entries(P.goals).map(([k,n]) => { const v = P.prog[k]||0; return `<div class="task ${v>=n?'done':''}"><div style="flex:1">${v>=n?'✅':'📈'} ${PLAN_G[k].t}<div class="lvl"><i class="on" style="flex:none;width:${Math.min(100, v/n*100)}%"></i></div></div><b>${fmt(v)}/${fmt(n)} ${PLAN_G[k].u}</b></div>`; }).join('')}
+    <button class="sm" style="margin-top:6px" data-act="supplies">🧰 Вітрина і матеріали</button></div>`;
+}
+/* ---------- інвентаризація ---------- */
+function invRows(){
+  const I = G.inv; if (I.rows) return I.rows;
+  const load = cellLoad(), cells = shuffle(Object.keys(load)).slice(0, 8);
+  const rows = cells.map(cell => ({cell, pids: G.parcels.filter(p => p.state === 'cell' && p.cell === cell).map(p => p.id), extra:null, ans:null}));
+  // розбіжності: «загублені» посилки і чужа посилка без ТТН
+  shuffle(rows.slice()).slice(0, ri(1, 2)).forEach(r => { const p = G.parcels.find(p => r.pids.includes(p.id) && !p.res); if (p) p.lost = 1; });
+  if (rows.length > 2 && Math.random() < 0.7){ const r = pick(rows.filter(r => !r.pids.some(id => (G.parcels.find(p => p.id === id)||{}).lost))); if (r) r.extra = pickItem().e; }
+  I.rows = rows; return rows;
+}
+function invBad(r){ return !!r.extra || r.pids.some(id => (G.parcels.find(p => p.id === id)||{}).lost); }
+function showInv(){
+  const rows = invRows();
+  showModal('📋 Інвентаризація', `<p>Регіональний попросив звірити комірки з системою. Порахуй, що лежить фізично, і порівняй з кількістю за системою.</p>
+    ${rows.map((r,i) => { const ps = G.parcels.filter(p => r.pids.includes(p.id)), fact = ps.filter(p => !p.lost).map(p => p.e).concat(r.extra ? [r.extra] : []);
+      return `<div class="task"><div style="flex:1"><b>🗄️ ${r.cell}</b> <span class="mute">за системою: <b>${ps.length}</b> пос.</span><div style="font-size:22px;margin-top:2px">${fact.join(' ') || '<span class="mute" style="font-size:14px">порожньо</span>'}</div></div>
+        <button class="sm ${r.ans==='ok'?'ok':''}" data-act="invans" data-id="${i}" data-v="ok">✅</button><button class="sm ${r.ans==='bad'?'pri':''}" data-act="invans" data-id="${i}" data-v="bad">⚠ Розбіжність</button></div>`; }).join('') || '<div class="mute">Комірки порожні — звіряти нічого.</div>'}
+    <button class="pri" style="width:100%;margin-top:8px" data-act="invdone" ${rows.every(r => r.ans) ? '' : 'disabled'}>📝 Здати акт інвентаризації (−15 хв)</button>`);
+}
+function invDone(){
+  const I = G.inv, rows = invRows(); let right = 0, found = 0, extra = 0;
+  for (const r of rows){
+    const bad = invBad(r);
+    if ((r.ans === 'bad') === bad){
+      right++;
+      if (bad){ G.parcels.forEach(p => { if (r.pids.includes(p.id) && p.lost){ p.lost = 0; found++; } }); if (r.extra){ const x = makeParcel({state:'outgoing'}); x.misOut = 1; extra++; } }
+    }
+  }
+  const wrong = rows.length - right, money = right*40 - wrong*60 + (wrong ? 0 : 300);
+  G.money += money; if (money > 0) G.stats.earned += money; addXp(right*3); G.time += 15;
+  if (!wrong) G.stats.invOk = (G.stats.invOk||0) + 1;
+  G.inv = {state:'done'}; closeModal(); save(); dirty = true;
+  toast(`📋 Інвентаризацію здано: ${right}/${rows.length} правильно${found ? `, знайдено ${found} пос.` : ''}${extra ? ', чужу посилку відправлено на пересорт' : ''} · ${money >= 0 ? '+' : ''}${fmt(money)} ₴`, wrong ? 'bad' : 'gold');
+}
+
 /* ---------- день ---------- */
 function startDay(){
   G.phase = 'day'; G.time = 480; G.today = blankToday(); G.trucksDone = {}; G.truck = null; pullGifts();
@@ -1309,7 +1450,10 @@ function startDay(){
   const stk = streakTick(); if (stk) setTimeout(() => toast(`🔥 Стрік: ${stk.n} ${stk.n === 1 ? 'день' : 'дн.'} поспіль! +${fmt(stk.rew)} ₴`, 'gold'), 2200);
   monthState();
   G.bizToday = Object.keys(G.biz || {}).filter(id => BIZ[id] && (G.day - G.biz[id].since) % BIZ[id].every === 0).map(id => ({id, at: ri(600, 960), done:false}));
-  rollDay(); genTasks();
+  rollDay(); genTasks(); planTick();
+  G.sup.bat = 100; G.sup.chg = 0; G.sup.lowBat = 0;
+  G.inv = G.level >= 2 && G.day % 7 === 0 ? {state:'due'} : null;
+  if (G.inv) setTimeout(() => toast('📋 Сьогодні інвентаризація! Зроби її на вкладці «Склад» до кінця зміни.', 'gold'), 3000);
   const se = curSeason(); if (se) setTimeout(() => toast(`${se.e} ${se.n}! ${se.d}`, 'gold'), 1400);
   SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.seen = false; if (SCENE.is3d && window.Hall3D) Hall3D.reset();
   G.staff.forEach(s => { s.bonusDay = 0; });
@@ -1348,6 +1492,9 @@ function endDay(){
   if (se && se.bonus && G.today.angry <= 2){ peakBonus = se.bonus; G.money += peakBonus; G.stats.earned += peakBonus; G.stats.peakDays = (G.stats.peakDays||0) + 1; }
   const rankBonus = RANKS[G.rank].bonus; if (rankBonus){ G.money += rankBonus; G.stats.earned += rankBonus; }
   const branchRep = simOthers();
+  let invFine = 0;
+  if (G.inv && G.inv.state === 'due'){ invFine = 200; G.money -= 200; G.rating = clamp(G.rating - 0.05, 1, 5); }
+  G.inv = null;
   // пересорт, що лежить у комірках
   const misIn = G.parcels.filter(p => p.mis && p.state === 'cell');
   let misFine = 0;
@@ -1355,7 +1502,7 @@ function endDay(){
   // термін зберігання 5 днів
   const old = G.parcels.filter(p => (p.state === 'cell' || p.state === 'locker') && G.day - p.inDay >= 5);
   if (old.length){ G.parcels = G.parcels.filter(p => !old.includes(p)); G.rating = clamp(G.rating - 0.02*old.length, 1, 5); }
-  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length, peakBonus, season:G.season, misN:misIn.length, misFine};
+  const sum = {...G.today, day:G.day, expired:old.length, trained, ev:G.ev, insp:G.insp && G.insp.res, quit, rankBonus, branchRep, tasks:G.tasks.filter(t=>t.done).length, peakBonus, season:G.season, misN:misIn.length, misFine, invFine};
   G.ev = null; G.eve = false; G.outage = null; G.insp = null;
   G.day++; G.phase = 'night'; G.time = 480;
   refreshCand(); checkAch(); checkMonth();
@@ -1457,6 +1604,7 @@ function tick(){
       if (c.pat <= 0) clientLeftAngry(c);
     }
     staffTick(dt * (manualMode() ? 0.6 : 1));
+    if (G.sup.chg && G.time >= G.sup.chg){ G.sup.chg = 0; G.sup.bat = 100; G.sup.lowBat = 0; toast('🔋 Сканер заряджено!', 'good'); dirty = true; }
     inspTick(); outageTick();
     if (G.time >= 1200) endDay();
   }
@@ -1563,6 +1711,7 @@ function renderTop(){
     <span class="pill">${tod}</span>
     ${G.phase==='day' ? `<span class="pill" title="${(WEATHER[G.weather]||WEATHER.sun).n}">${(WEATHER[G.weather]||WEATHER.sun).e}${curEvent() ? ' ' + curEvent().e : ''}${manualMode() ? ' 🔦' : ''}</span>` : ''}
     <span class="pill" id="money">💰 ${fmt(G.money)} ₴</span>
+    ${G.phase==='day' && (G.sup.lbl < 15 || G.sup.bat < 20 || G.sup.chg > G.time) ? `<button class="topbtn" data-act="supplies" title="Матеріали">${G.sup.lbl < 15 ? '🧾' + G.sup.lbl : ''}${G.sup.bat < 20 || G.sup.chg > G.time ? (G.sup.chg > G.time ? '🔌' : '🪫') : ''}</button>` : ''}
     <span class="pill" title="Рейтинг відділення">⭐ <span id="rat">${G.rating.toFixed(2)}</span></span>
     <span class="pill" title="${RANKS[G.rank].n}">${RANKS[G.rank].e} Рів. ${G.level}</span>
     ${G.phase==='day' ? `<button class="topbtn" data-act="pause" title="Пауза">${paused?'▶️':'⏸️'}</button>
@@ -1705,7 +1854,9 @@ function viewStore(){
   const term = hand && hand.mis ? `📟 ТТН <b>${hand.ttn}</b> · ${SIZE_N[hand.s]} · ${hand.w} кг<br><b style="color:#ff8a80">⚠ ПЕРЕСОРТ!</b> Отримувач чекає у <b>відділенні №${hand.mis.br}, ${hand.mis.city}</b> — це не наше відділення.<br><button class="sm pri" style="margin-top:6px" data-act="misout">🔀 Відкласти на відправку (вечірня машина)</button>`
     : hand ? `📟 ТТН <b>${hand.ttn}</b> · ${SIZE_N[hand.s]} · ${hand.w} кг<br>➡ Розмістити в комірку: <b style="font-size:18px">${hand.target || 'НЕМАЄ МІСЦЯ'}</b>`
     : pile.length ? '📟 Відскануй посилку з розбору: затисни палець (або наведи мишку) на штрихкод' : '📟 Розбір порожній. Чекай на машину або видавай посилки 👍';
-  return `${want3D() && G.phase === 'day' ? '<div id="sceneSlot"></div>' : ''}<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
+  const invH = G.inv && G.inv.state === 'due' && G.phase === 'day' ? `<div class="banner ev">📋 <b>Інвентаризація</b> — звір комірки з системою до кінця зміни, інакше штраф 200 ₴. <button class="sm pri" data-act="invopen">Почати</button></div>` : '';
+  const supH = `<div class="card"><div class="row"><b>🧰 Матеріали:</b><span>🧾 ${G.sup.lbl} етикеток + ${G.sup.rolls} рул.</span><span>${G.sup.bat <= 0 ? '🪫' : '🔋'} ${Math.round(G.sup.bat)}%</span><span class="sp"></span><button class="sm" data-act="supplies">Відкрити</button></div></div>`;
+  return `${want3D() && G.phase === 'day' ? '<div id="sceneSlot"></div>' : ''}${invH}<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
       <div class="terminal">${term}</div>
       <div class="pile">${pile.map(p => parcelHTML(p, G.hand===p.id ? 'take' : 'scanhint', G.hand===p.id ? '' : 'take')).join('') || '<span class="mute">Порожньо</span>'}</div></div>
     <div class="card"><h3>🗄️ Комірки <span class="mute">(${inCells} посилок)</span></h3>
@@ -1718,7 +1869,7 @@ function viewStore(){
         <button class="sm" data-act="lockload" ${lp.length >= cap || G.phase !== 'day' ? 'disabled' : ''}>🟥 Завантажити поштомат (≈1 хв на посилку)</button></div>`; })() : ''}
     <div class="card"><h3>📤 Відправлення <span class="mute">(${out.length})</span></h3>
       <div class="mute">Прийняті посилки чекають на вечірню машину (18:00). Завантажити їх можна на вкладці «Рампа».</div>
-      <div class="pile" style="margin-top:6px">${out.map(p => `<div class="parcel s${p.s}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${outTag(p)}${p.state==='loaded'?'<div class="tag">✅ в машині</div>':''}</div>`).join('')}</div></div>`;
+      <div class="pile" style="margin-top:6px">${out.map(p => `<div class="parcel s${p.s}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${outTag(p)}${p.state==='loaded'?'<div class="tag">✅ в машині</div>':''}</div>`).join('')}</div></div>${supH}`;
 }
 function viewRamp(){
   if (G.phase === 'night') return `<div class="card bigstart"><div class="e">🌙</div><p class="mute">Машини приїдуть зранку о 08:00.</p></div>`;
@@ -1826,7 +1977,7 @@ function viewCareer(){
     ${Object.entries(BIZ).map(([k,b]) => { const on = G.biz[k];
       return `<div class="task"><span style="font-size:24px">${b.av}</span><div style="flex:1"><b>${b.n}</b><div class="mute">${b.d} Тариф ${b.rate} ₴/шт${on ? ` · ✅ діє з дня ${on.since}${on.strikes ? ` · ⚠ скарг ${on.strikes}/3` : ''}` : ''}</div></div>
         ${on ? `<button class="sm ghost" data-act="bizend" data-k="${k}">Розірвати</button>` : G.level < b.lvl ? `<span class="mute">🔒 рів. ${b.lvl}</span>` : `<button class="sm ok" data-act="bizsign" data-k="${k}" ${bizN >= bizMax() ? 'disabled' : ''}>Підписати</button>`}</div>`; }).join('')}</div>`;
-  return rankH + strH + tasksH + bizH + brH + achH;
+  return rankH + strH + tasksH + planCard() + bizH + brH + achH;
 }
 function cityMap(pickAct, sel){
   const all = [{branch:G.branch, city:G.city, district:G.district, rating:G.rating, cur:1}, ...G.others];
@@ -2029,6 +2180,20 @@ function renderFlow(){
       body += `<div class="pile" style="margin-bottom:10px">${ps.map(p => parcelHTML(p, '')).join('')}</div>
         <button class="ok" style="width:100%;padding:14px" data-act="give">📦 Видати посилку</button>`;
     }
+  } else if (c.kind === 'shop'){
+    body += stepsBar(['Вітрина','Оплата','Видача'], {shop:0, pay:1, shopdone:2}[FLOW.step]);
+    if (FLOW.step === 'shop'){
+      const cart = FLOW.cart || (FLOW.cart = {}), st = G.shopStock || {};
+      body += speaker(c, c.hi);
+      body += `<div class="mute" style="margin-bottom:6px">Набери замовлення з вітрини:</div><div class="opts">${Object.entries(SHOP).map(([k,x]) => `<button data-act="shopadd" data-k="${k}" ${(st[k]||0) - (cart[k]||0) <= 0 ? 'disabled' : ''}><span style="font-size:22px">${x.e}</span><br>${x.n}<br><small>${x.p} ₴ · є ${st[k]||0}</small></button>`).join('')}</div>
+        <div class="terminal" style="margin-top:8px">🛒 ${Object.keys(cart).length ? Object.entries(cart).map(([k,q]) => `${SHOP[k].e} ${SHOP[k].n} × ${q}`).join('<br>') : 'Кошик порожній'}</div>
+        <div class="row"><button class="sm ghost" data-act="shopclear">🗑️ Очистити</button><span class="sp"></span><button class="pri" data-act="shopnext" ${Object.keys(cart).length ? '' : 'disabled'}>До оплати ➜</button></div>`;
+    } else if (FLOW.step === 'pay'){
+      body += payHTML(c, flowTotal(c), Object.entries(FLOW.cart).map(([k,q]) => `${SHOP[k].e} ${SHOP[k].n} × ${q}`).join('<br>'));
+    } else {
+      body += speaker(c, 'Дякую!');
+      body += `<div class="opened">${Object.keys(FLOW.cart).map(k => SHOP[k].e).join('')}</div><button class="ok" style="width:100%;padding:14px" data-act="shopgive">🛍️ Видати товар і чек</button>`;
+    }
   } else if (c.kind === 'info'){
     const T = c.track;
     body += speaker(c, `${c.hi}<br>Ось ТТН: <b>${T.ttn}</b>`);
@@ -2064,7 +2229,7 @@ function renderFlow(){
     }
   } else {
     const it = c.items[FLOW.i];
-    const LBL = {pack:'Пакування', weigh:'Зважування', value:'Вартість', city:'Місто', pay:'Оплата', print:'ТТН', ban:'Перевірка', decl:'Декларація', country:'Країна', cod:'Післяплата'};
+    const LBL = {bigpack:'Пакування', dims:'Габарит', pack:'Пакування', weigh:'Зважування', value:'Вартість', city:'Місто', pay:'Оплата', print:'ТТН', ban:'Перевірка', decl:'Декларація', country:'Країна', cod:'Післяплата'};
     const keys = []; let si = 0;
     c.items.forEach((x,i) => itemSteps(x).forEach(k => { if (i === FLOW.i && k === FLOW.step) si = keys.length; keys.push(k); }));
     if (FLOW.step === 'pay' || FLOW.step === 'allref') si = keys.length; if (FLOW.step === 'print') si = keys.length + 1;
@@ -2106,6 +2271,23 @@ function renderFlow(){
       body += speaker(c, 'Ой, не знав(ла), що таке не можна… Добре, залишу собі. Дякую, що сказали!');
       body += `<button class="pri" style="width:100%" data-act="allref">👋 До побачення</button>`;
     }
+    if (FLOW.step === 'bigpack' || FLOW.step === 'dims'){
+      body += speaker(c, FLOW.step === 'bigpack' ? `${esc(c.hi)} <b>${it.item.toLowerCase()}</b> — він великий, стоїть біля входу${it.f ? ', і дуже крихкий!' : '.'}` : 'Скільки це буде коштувати?');
+      body += `<div class="itemcard"><span class="ie">${it.e}</span><div><b>${it.item}</b> · негабарит<div class="mute">${it.packed ? '🏷️ У заводській коробці' : 'Без упаковки'}${it.f ? ' · <b class="fr">⚠ Крихке</b>' : ''}</div></div></div>`;
+    }
+    if (FLOW.step === 'bigpack'){
+      body += `<div class="mute" style="margin-bottom:6px">Пакування негабариту (крихку техніку — тільки в обрешітку):</div><div class="opts">${BIGPACK.map(b => `<button data-act="bigpack" data-v="${b.k}">${b.n}${b.price ? `<br><small>${b.price} ₴</small>` : ''}</button>`).join('')}</div>`;
+    } else if (FLOW.step === 'dims'){
+      const vw = volW(it), bw = billW(it);
+      if (!FLOW.measured) body += `<div class="mute" style="margin-bottom:6px">Постав на підлогові ваги і зміряй рулеткою:</div><button class="pri" style="width:100%" data-act="measure">⚖️📏 Зважити і виміряти</button>`;
+      else {
+        if (!FLOW.dimOpts) FLOW.dimOpts = shuffle([...new Set([bw, it.w, +(vw*4/5).toFixed(1), +(it.dims[0]*it.dims[1]*it.dims[2]/1000).toFixed(1), +(it.w + vw).toFixed(1)].map(x => +x))].filter(x => x > 0)).slice(0, 4);
+        if (!FLOW.dimOpts.includes(bw)) FLOW.dimOpts[0] = bw, FLOW.dimOpts = shuffle(FLOW.dimOpts);
+        body += `<div class="scale"><div class="disp">${it.w.toFixed(1)} кг</div><div class="mute" style="margin-top:6px">📏 ${it.dims.join(' × ')} см</div></div>
+          <div class="terminal">Об’ємна вага = Д × Ш × В (см) ÷ 4000. Тариф рахується за <b>більшою</b> з фактичної та об’ємної ваги.</div>
+          <div class="mute" style="margin-bottom:6px">Розрахункова вага для тарифу:</div><div class="opts">${FLOW.dimOpts.map(v => `<button data-act="dimpick" data-v="${v}">${v} кг</button>`).join('')}</div>`;
+      }
+    }
     if (FLOW.step === 'pack' || FLOW.step === 'weigh' || FLOW.step === 'city'){
       const say = FLOW.step === 'city' ? `Відправляємо в <b>${it.city}</b>, на відділення.` :
         `${esc(FLOW.i ? 'І ще одну:' : c.hi)} <b>${it.item.toLowerCase()}</b>${it.f ? ' — обережно, там крихке!' : ''}${c.items.length>1?` (${FLOW.i+1}/${c.items.length})`:''}`;
@@ -2123,7 +2305,9 @@ function renderFlow(){
       if (!FLOW.cityOpts) FLOW.cityOpts = shuffle([it.city, ...shuffle(CITIES.filter(x => x !== it.city)).slice(0,3)]);
       body += `<div class="mute" style="margin-bottom:6px">Місто призначення:</div><div class="opts">${FLOW.cityOpts.map(x => `<button data-act="city" data-v="${x}">${x}</button>`).join('')}</div>`;
     } else if (FLOW.step === 'pay'){
-      const tot = sendTotal(c);
+      const tot = sendTotal(c), st = G.shopStock || {};
+      const offer = !c.biz && !FLOW.pay.stage && !FLOW.offered ? ['tape','card','wrap','env'].filter(k => (st[k]||0) > 0).slice(0, 3) : [];
+      if (offer.length) body += `<div class="cellbox" style="margin-bottom:8px"><b>💡 Допродаж:</b> <span class="mute">запропонуй щось з вітрини (план продажів!)</span><div class="opts" style="margin-top:6px">${offer.map(k => `<button data-act="upsell" data-k="${k}">${SHOP[k].e} ${SHOP[k].n} · ${SHOP[k].p} ₴</button>`).join('')}</div></div>`;
       body += payHTML(c, tot.sum, tot.label);
     } else if (FLOW.step === 'print'){
       body += speaker(c, 'Супер, дякую!');
@@ -2131,18 +2315,19 @@ function renderFlow(){
       body += `<button class="ok" style="width:100%;padding:14px" data-act="print">🖨️ Надрукувати ТТН і прийняти</button>`;
     }
   }
+  if (FLOW.jam || FLOW.needRoll) body = supplyHTML(c);
   const pr = clamp(c.pat/c.max, 0, 1);
   showModal(`${c.av} ${esc(c.name)}${reg?' ⭐':''}`, `<div class="pat" style="margin:-4px 0 10px"><i data-pat="${c.id}" style="width:${pr*100}%"></i></div>${body}`, true);
 }
 function itemSteps(it){
   if (it.intl) return ['ban','pack','weigh','decl','country'];
-  const k = ['pack','weigh']; if (it.val) k.push('value'); k.push('city'); if (it.cod) k.push('cod');
+  const k = isBig(it) ? ['bigpack','dims'] : ['pack','weigh']; if (it.val) k.push('value'); k.push('city'); if (it.cod) k.push('cod');
   return k;
 }
 // перехід до наступного кроку відправлення (або наступної речі / оплати)
 function advItem(c, from){
   const it = c.items[FLOW.i], ks = itemSteps(it), nx = it.refused ? null : ks[ks.indexOf(from) + 1];
-  FLOW.valOpts = FLOW.cityOpts = FLOW.declOpts = FLOW.codOpts = null;
+  FLOW.valOpts = FLOW.cityOpts = FLOW.declOpts = FLOW.codOpts = FLOW.dimOpts = null; FLOW.measured = false;
   if (nx){ FLOW.step = nx; if (nx === 'weigh') FLOW.weighed = false; return; }
   if (!it.refused && !it.ttn) it.ttn = ttn();
   if (FLOW.i < c.items.length - 1){ FLOW.i++; FLOW.step = itemSteps(c.items[FLOW.i])[0]; FLOW.pack = null; FLOW.wrap = false; FLOW.weighed = false; }
@@ -2167,6 +2352,7 @@ function getSteps(c){
 }
 function nextGetStep(c, from){ const k = getSteps(c); return k[k.indexOf(from) + 1] || 'give'; }
 function flowTotal(c){
+  if (c.kind === 'shop') return Object.entries((FLOW && FLOW.cart) || {}).reduce((a,[k,q]) => a + q*SHOP[k].p, 0);
   if (c.kind === 'send') return sendTotal(c).sum;
   if (c.redir) return REDIR_FEE;
   const sum = G.parcels.filter(p => c.pids.includes(p.id)).reduce((a,p) => a + p.cod, 0) + (FLOW && FLOW.feeWaived ? 0 : feeOf(c));
@@ -2194,9 +2380,10 @@ function sendTotal(c){
   let sum = 0; const parts = [];
   for (const it of c.items){
     if (it.refused) continue;
-    const pr = it.intl ? intlPrice(it.w) : sendPrice(it.w, it.f), vf = it.intl ? 0 : valFee(it.val), cf = codFee(it.cod); sum += pr + (it.packPrice||0) + vf + cf;
-    parts.push(`${it.e} доставка${it.intl ? ' за кордон' : ''} ${pr} ₴${it.packPrice?` + пакування ${it.packPrice} ₴`:''}${vf?` + страховка ${vf} ₴`:''}${cf?` + післяплата ${cf} ₴`:''}`);
+    const pr = itemBase(it), vf = it.intl ? 0 : valFee(it.val), cf = codFee(it.cod); sum += pr + (it.packPrice||0) + vf + cf;
+    parts.push(`${it.e} доставка${it.intl ? ' за кордон' : isBig(it) ? ` негабарит (${billW(it)} кг)` : ''} ${pr} ₴${it.packPrice?` + пакування ${it.packPrice} ₴`:''}${vf?` + страховка ${vf} ₴`:''}${cf?` + післяплата ${cf} ₴`:''}`);
   }
+  for (const u of c.upsell || []){ sum += u.p; parts.push(`${u.e} ${u.n} ${u.p} ₴`); }
   return {sum, label: parts.join('<br>')};
 }
 function flowAct(act, el){
@@ -2268,7 +2455,7 @@ function flowAct(act, el){
     if (v !== right){ mistake(rd.type === 'back' ? 'Клієнт просив повернути відправнику!' : rd.type === 'city' ? `Клієнт казав «${rd.city}»!` : `Новий отримувач — ${rd.name}!`); return renderFlow(); }
     sScan(); FLOW.step = nextGetStep(c, 'redir'); return renderFlow();
   }
-  if (act === 'reprint'){ sPrinter(); return finishRedir(c); }
+  if (act === 'reprint'){ if (!printGuard(1)) return; sPrinter(); return finishRedir(c); }
   if (act === 'valpick'){
     const it = c.items[FLOW.i];
     if (+v !== it.val){ mistake(`Клієнт казав ${fmt(it.val)} ₴!`); return renderFlow(); }
@@ -2307,6 +2494,44 @@ function flowAct(act, el){
     FLOW.codLess = cp ? cp.cod - c.codArg.claim : 0; G.today.short += FLOW.codLess; FLOW.mist++; sErr();
     toast(`😬 Відправнику все одно треба перерахувати ${fmt(cp ? cp.cod : 0)} ₴ — ввечері в касі буде недостача ${fmt(FLOW.codLess)} ₴!`, 'bad');
     FLOW.step = nextGetStep(c, 'codchk'); return renderFlow();
+  }
+  if (act === 'fixjam'){ FLOW.jam = false; c.pat -= 3; beep(300, 0.2, 'sawtooth', 0.03); toast('🔧 Етикетку витягнуто — друкуй ще раз'); return renderFlow(); }
+  if (act === 'newroll'){ if (G.sup.rolls <= 0) return; G.sup.rolls--; G.sup.lbl += ROLL; G.sup.warned = 0; FLOW.needRoll = false; c.pat -= 4; beep(600, 0.1, 'triangle'); toast('🧾 Новий рулон стоїть — друкуй'); return renderFlow(); }
+  if (act === 'rushroll'){ G.money -= ROLL_RUSH; G.time += 20; G.sup.lbl += ROLL; FLOW.needRoll = false; c.pat -= 10; sCash(); toast(`🚕 Рулон привезли (−${ROLL_RUSH} ₴, −20 хв)`, 'bad'); return renderFlow(); }
+  if (act === 'bigpack'){
+    const it = c.items[FLOW.i], right = bigPackRight(it);
+    if (v !== right && !(v === 'crate' && right === 'stretch')){ mistake(right === 'crate' ? 'Крихку техніку відправляють тільки в дерев’яній обрешітці!' : right === 'own' ? 'Він уже в заводській коробці — пакування не потрібне' : 'Без пакування не можна — обгорни стретч-плівкою з кутиками'); return renderFlow(); }
+    if (v !== right){ FLOW.extra -= 0.5; toast('Обрешітка тут не обов’язкова — клієнт переплатив і бурчить'); }
+    it.packPrice = BIGPACK.find(b => b.k === v).price; sScan();
+    const helper = G.staff.find(s => s.role === 'store' && !s.training);
+    if (helper) toast(`💪 ${esc(helper.name)} допоміг(ла) занести ${it.item.toLowerCase()}`);
+    else { G.time += 8; toast('🏋️ Нікого на складі — тягнеш сам(а) з клієнтом (−8 хв). Найми працівника складу!'); }
+    advItem(c, 'bigpack'); return renderFlow();
+  }
+  if (act === 'measure'){ FLOW.measured = true; beep(1200, 0.05); return renderFlow(); }
+  if (act === 'dimpick'){
+    const it = c.items[FLOW.i];
+    if (+v !== billW(it)){ mistake(`Об’ємна вага ${volW(it)} кг, фактична ${it.w} кг — береться більша!`); return renderFlow(); }
+    it.bw = billW(it); sScan(); advItem(c, 'dims'); return renderFlow();
+  }
+  if (act === 'shopadd'){ const k = el.dataset.k; FLOW.cart[k] = (FLOW.cart[k]||0) + 1; beep(700, 0.04, 'triangle'); return renderFlow(); }
+  if (act === 'shopclear'){ FLOW.cart = {}; return renderFlow(); }
+  if (act === 'shopnext'){
+    const want = Object.fromEntries(c.buy.map(b => [b.k, b.q])), cart = FLOW.cart;
+    const same = Object.keys(want).length === Object.keys(cart).length && Object.keys(want).every(k => cart[k] === want[k]);
+    if (!same){ mistake('Клієнт просив інше! Перечитай замовлення'); FLOW.cart = {}; return renderFlow(); }
+    sScan(); FLOW.step = 'pay'; return renderFlow();
+  }
+  if (act === 'shopgive') return finishShop(c);
+  if (act === 'upsell'){
+    const k = el.dataset.k, x = SHOP[k]; if (!x || FLOW.offered) return;
+    FLOW.offered = true;
+    const hearts = c.reg ? regInfo(c.reg).hearts : 0;
+    if (Math.random() < 0.35 + hearts*0.06 && (G.shopStock[k]||0) > 0){
+      G.shopStock[k]--; (c.upsell = c.upsell || []).push({k, n:x.n, e:x.e, p:x.p}); FLOW.pay = {}; sCash(); planAdd('shop', x.p);
+      toast(`💡 ${esc(c.name)}: «О, давайте!» +${x.p} ₴`, 'good');
+    } else toast(`${esc(c.name)}: «Ні, дякую, не треба»`);
+    return renderFlow();
   }
   if (act === 'trpick'){
     if (v !== c.track.st){ mistake('Подивись уважніше на історію відстеження!'); return renderFlow(); }
@@ -2349,7 +2574,7 @@ function flowAct(act, el){
   }
   if (act === 'bulkweigh'){ FLOW.weighed = true; beep(1200, 0.05); return renderFlow(); }
   if (act === 'bulkok'){ FLOW.step = 'print'; return renderFlow(); }
-  if (act === 'bulkprint'){ sPrinter(); return finishBiz(c); }
+  if (act === 'bulkprint'){ if (!printGuard(1)) return; sPrinter(); return finishBiz(c); }
   if (act === 'clopen'){ FLOW.clOpen = 1; beep(300, 0.15, 'sawtooth', 0.03); return renderFlow(); }
   if (act === 'clbox'){ FLOW.clBox = v; return renderFlow(); }
   if (act === 'clwho'){ FLOW.clWho = v; return renderFlow(); }
@@ -2399,9 +2624,9 @@ function flowAct(act, el){
     sScan(); advItem(c, 'city');
     return renderFlow();
   }
-  if (act === 'print'){ sPrinter(); return finishSend(c); }
+  if (act === 'print'){ if (!printGuard(c.items.filter(it => !it.refused).length)) return; sPrinter(); return finishSend(c); }
 }
-function nextAfterPay(c){ FLOW.step = c.kind === 'get' ? (c.redir ? 'reprint' : 'give') : 'print'; FLOW.pay = {}; }
+function nextAfterPay(c){ FLOW.step = c.kind === 'shop' ? 'shopdone' : c.kind === 'get' ? (c.redir ? 'reprint' : 'give') : 'print'; FLOW.pay = {}; }
 function afterPick(c){
   if (c.pids.every(id => FLOW.picked.includes(id))){ FLOW.openCell = null; FLOW.step = nextGetStep(c, 'cells'); }
 }
@@ -2442,6 +2667,15 @@ function finishGet(c){
   if (c.reg) countTask('regs', 1); if (tip) countTask('tips', 1);
   sCash(); if (sat >= 4) regGift(c);
   toast(`${'⭐'.repeat(Math.round(sat))} +${money} ₴${tip?` · чайові ${tip} ₴ 💝`:''}`, 'good');
+}
+function finishShop(c){
+  let money = 0;
+  for (const [k,q] of Object.entries(FLOW.cart)){ const n = Math.min(q, G.shopStock[k]||0); G.shopStock[k] -= n; money += n*SHOP[k].p; }
+  planAdd('shop', money);
+  const sat = rate(flowSat(c), c);
+  FLOW = null; closeModal(); removeClient(c);
+  addMoney(money); addXp(6); sCash();
+  toast(`${'⭐'.repeat(Math.round(sat))} 🛍️ Продано з вітрини · +${money} ₴`, 'good');
 }
 function finishInfo(c){
   const T = c.track, ok = TRACK[T.st].ok;
@@ -2490,6 +2724,7 @@ function finishSend(c){
   const nI = ok.filter(it => it.intl).length, nC = ok.filter(it => it.cod).length;
   if (nI){ countTask('intl', nI); G.stats.intl = (G.stats.intl||0) + nI; }
   if (nC) countTask('cod', nC);
+  planAdd('pack', ok.reduce((a,it) => a + (it.packPrice||0), 0)); planAdd('ins', ok.filter(it => it.val && !it.intl).length);
   G.stats.sent += n; G.today.sent += n;
   const sat = rate(flowSat(c), c);
   const tip = tipFor(c, sat);
@@ -2519,6 +2754,7 @@ function showDaySummary(s){
     ${s.expired?`<span>⌛ Повернуто (термін зберігання)</span><b>${s.expired}</b>`:''}
     ${s.returned?`<span>🔙 Не розвантажено з машин</span><b>${s.returned}</b>`:''}
     ${s.misN?`<span>🔀 Пересорт лежав у комірках</span><b>${s.misN} · −${fmt(s.misFine)} ₴</b>`:''}
+    ${s.invFine?`<span>📋 Інвентаризацію не зроблено</span><b>−${fmt(s.invFine)} ₴</b>`:''}
     ${s.cash ? `<span>🧮 Звірка каси</span><b>${s.cash.right && !s.cash.short ? '✅ зійшлась' : s.cash.money < 0 ? '−' + fmt(-s.cash.money) + ' ₴' : '✅'}</b>` : ''}
     ${s.insp ? `<span>👔 Перевірка менеджера</span><b>${s.insp.avg}/5${s.insp.bonus ? ' · +' + fmt(s.insp.bonus) + ' ₴' : ''}</b>` : ''}
     <span>⭐ Рейтинг відділення</span><b>${G.rating.toFixed(2)}</b></div>
@@ -2555,6 +2791,7 @@ function showGuide(){
     <li><b>🟥 Поштомат</b> (покращення): завантажуй туди малі посилки на «Складі», клієнти заберуть самі. Якщо поштомат видає помилку — обери правильну дію. <b>🤝 Бізнес-клієнти</b> (Кар’єра): магазини приносять партії коробок за договором.</li>
     <li><b>🗺️ Мережа:</b> у «Кар’єрі» обери район головного відділення і відкривай до 5 відділень у різних районах — від району залежать клієнти. Там же 🔥 стрік щоденної гри і 🗓️ цілі місяця. <b>🧊 3D:</b> кнопки 🏢 📦 🗺️ показують зал, склад з рампою, кухню й туалет; тап по машині — розвантажити коробку.</li>
     <li><b>❓ «Де моя посилка?»</b> — подивись історію відстеження і поясни клієнту. <b>🔀 Пересорт:</b> якщо термінал при скануванні пише «не наше відділення» — відклади посилку на вечірню машину, не клади в комірку. <b>🔐 Код з SMS:</b> звір код клієнта з кодом у системі; немає SMS — надішли ще раз, телефон сів — перевір паспорт. <b>⌛ Зберігання:</b> перші 3 дні безкоштовно, далі 10 ₴/день — доплату можна списати.</li>
+    <li><b>🧰 Матеріали:</b> купуй рулони термострічки (без неї ТТН не надрукуєш), став 🔋 сканер на зарядку. Принтер іноді зажовує етикетку. <b>🛍️ Вітрина:</b> продавай коробки, скотч і листівки, пропонуй їх під час оплати — у «Кар’єрі» є 📈 план продажів на тиждень. <b>🛋️ Негабарит:</b> крихку техніку — в обрешітку; тариф за більшою з ваг (об’ємна = Д×Ш×В÷4000). <b>📋 Інвентаризація</b> щосьомого дня: звір комірки з системою.</li>
     <li><b>🤝 Кооператив</b> (Онлайн): відкрий зміну і дай другу код — він обслуговуватиме твоїх клієнтів зі свого пристрою в реальному часі.</li>
     <li><b>Сезони:</b> у листопаді — пік Чорної п’ятниці, з 10 грудня — новорічний пік (за справжнім календарем). Взимку можна купити 🎄 святковий декор, а постійні клієнти приносять подарунки.</li>
     <li><b>Події:</b> свята й розпродажі (більше посилок і додаткова машина), погода, раптова перевірка менеджера (тримай зал чистим 🧹), відключення світла (купи 🔌 генератор).</li>
@@ -2585,9 +2822,16 @@ function showSettings(){
 /* ---------- дії ---------- */
 function act(a, el){
   const id = +el.dataset.id;
-  if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina','appscan','proxyok','proxyno','closecell','pickscan','lostsearch','lostpick','open','inspok','inspno','refuse','redirpick','reprint','valpick','banok','banno','declpick','country','codpick','allref','codok','codless','clopen','clbox','clwho','clprint','lockpick','bulkscan','bulkweigh','bulkok','bulkprint','trpick','smspick','smspassok','smspassno','feeok','feewaive'].includes(a)) return flowAct(a, el);
+  if (['findrow','fetchcell','pay','change','give','packsel','wrap','pack','weigh','weighok','city','print','nina','appscan','proxyok','proxyno','closecell','pickscan','lostsearch','lostpick','open','inspok','inspno','refuse','redirpick','reprint','valpick','banok','banno','declpick','country','codpick','allref','codok','codless','clopen','clbox','clwho','clprint','lockpick','bulkscan','bulkweigh','bulkok','bulkprint','trpick','smspick','smspassok','smspassno','feeok','feewaive','fixjam','newroll','rushroll','bigpack','measure','dimpick','shopadd','shopclear','shopnext','shopgive','upsell'].includes(a)) return flowAct(a, el);
   switch(a){
     case 'scanhint': return toast('📟 Затисни штрихкод на посилці, щоб відсканувати');
+    case 'supplies': return showSupplies();
+    case 'buyroll': { const n = +el.dataset.v || 1; if (G.money < n*ROLL_COST) return toast('Не вистачає грошей', 'bad'); G.money -= n*ROLL_COST; G.sup.rolls += n; G.sup.warned = 0; sCash(); dirty = true; return showSupplies(); }
+    case 'charge': { if (G.phase !== 'day') return; G.sup.chg = G.time + 25; toast('🔌 Сканер на зарядці 25 хв — поки що номери вводиш вручну'); dirty = true; return showSupplies(); }
+    case 'restock': { const k = el.dataset.k, x = SHOP[k]; if (!x) return; if (G.money < x.c*10) return toast('Не вистачає грошей', 'bad'); G.money -= x.c*10; G.shopStock[k] = (G.shopStock[k]||0) + 10; sCash(); dirty = true; return showSupplies(); }
+    case 'invopen': if (!G.inv || G.inv.state !== 'due') return; return showInv();
+    case 'invans': { const r = invRows()[id]; if (r){ r.ans = el.dataset.v; showInv(); } return; }
+    case 'invdone': return invDone();
     case 'misout': { const p = G.parcels.find(p => p.id === G.hand); if (!p || !p.mis) return; misOut(p); sScan(); addXp(6); countTask('mis', 1); toast(`🔀 Пересорт відкладено — поїде у відділення №${p.mis.br} (${p.mis.city}) вечірньою машиною`, 'good'); return; }
     case 'serve': if (!FLOW) sayNext(); return openServe(id || (G.queue.find(c => !c.by)||{}).id);
     case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
