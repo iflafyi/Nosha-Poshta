@@ -191,6 +191,8 @@ main{padding:4px 10px}
 #scene .h3d{display:block;width:100%;height:100%;cursor:grab}
 #scene .h3dctl{position:absolute;right:6px;bottom:6px;display:flex;gap:4px}
 #scene .h3dctl button{width:32px;height:32px;padding:0;border-radius:8px;border:1px solid #ffffff55;background:#00000066;color:#fff;font-size:17px;line-height:1}
+#scene .h3dctl button.on{background:#d7262bcc;border-color:#fff}
+@media (max-width:520px){#scene .h3dctl{gap:3px;right:4px;bottom:4px}#scene .h3dctl button{width:27px;height:27px;font-size:14px;border-radius:7px}}
 #scene .h3dhint{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:#000000a0;color:#fff;font-size:12px;padding:4px 10px;border-radius:10px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;transition:opacity .6s}
 #scene .h3dhint[hidden]{display:block;opacity:0}
 .visit{margin-top:8px}.visit .vq{display:flex;gap:6px;font-size:28px;justify-content:center;min-height:36px}.visit .vw{display:flex;gap:10px;justify-content:center;font-size:24px;flex-wrap:wrap}
@@ -238,7 +240,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011040; // ставиться build.py
+const GAME_BUILD = 202611011047; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -1583,7 +1585,7 @@ function viewStore(){
   const inCells = G.parcels.filter(p => p.state === 'cell').length;
   const term = hand ? `📟 ТТН <b>${hand.ttn}</b> · ${SIZE_N[hand.s]} · ${hand.w} кг<br>➡ Розмістити в комірку: <b style="font-size:18px">${hand.target || 'НЕМАЄ МІСЦЯ'}</b>`
     : pile.length ? '📟 Відскануй посилку з розбору: затисни палець (або наведи мишку) на штрихкод' : '📟 Розбір порожній. Чекай на машину або видавай посилки 👍';
-  return `<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
+  return `${want3D() && G.phase === 'day' ? '<div id="sceneSlot"></div>' : ''}<div class="card"><h3>📥 Розбір <span class="mute">(${pile.length})</span></h3>
       <div class="terminal">${term}</div>
       <div class="pile">${pile.map(p => parcelHTML(p, G.hand===p.id ? 'take' : 'scanhint', G.hand===p.id ? '' : 'take')).join('') || '<span class="mute">Порожньо</span>'}</div></div>
     <div class="card"><h3>🗄️ Комірки <span class="mute">(${inCells} посилок)</span></h3>
@@ -1602,17 +1604,18 @@ function viewRamp(){
   if (G.phase === 'night') return `<div class="card bigstart"><div class="e">🌙</div><p class="mute">Машини приїдуть зранку о 08:00.</p></div>`;
   const t = G.truck;
   const next = [['m',480,'08:00','привозить посилки'],['d',780,'13:00','привозить посилки'],['e',1080,'18:00','забирає відправлення']].filter(x => !G.trucksDone[x[0]]);
-  if (!t) return `<div class="card bigstart"><div class="e">🅿️</div><h3 style="justify-content:center">Рампа вільна</h3>
+  if (!t) return `${want3D() ? '<div id="sceneSlot"></div>' : ''}<div class="card bigstart"><div class="e">🅿️</div><h3 style="justify-content:center">Рампа вільна</h3>
      <p class="mute">${next.length ? 'Наступна машина: ' + next.map(x => `<b>${x[2]}</b> (${x[3]})`).join(', ') : 'Сьогодні машин більше не буде.'}</p></div>`;
+  const slot3d = want3D() ? '<div id="sceneSlot"></div>' : '';
   if (t.kind === 'in'){
     const boxes = G.parcels.filter(p => p.state === 'truck');
-    return `<div class="truck"><div class="truckcab"><span class="te">🚚</span><div><b>Машина з посилками</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span> — встигни розвантажити все! Великі коробки треба тягнути кілька разів${G.up.cart?' (з роклою — один)':''}.</div></div></div>
+    return `${slot3d}<div class="truck"><div class="truckcab"><span class="te">🚚</span><div><b>Машина з посилками</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span> — встигни розвантажити все! Великі коробки треба тягнути кілька разів${G.up.cart?' (з роклою — один)':''}.</div></div></div>
       <div class="truckbody">${boxes.map(p => { const need = G.up.cart ? 1 : p.s>=4?3:p.s===3?2:1; return `<div class="box s${p.s}" data-act="unload" data-id="${p.id}">${p.e}<span>${SIZE_N[p.s]}</span>${need>1?`<div class="pr"><i style="width:${p.unl/need*100}%"></i></div>`:''}</div>`; }).join('') || '<div class="mute" style="padding:30px">✅ Все розвантажено! Машина скоро поїде.</div>'}</div>
       ${boxes.length ? `<div style="margin-top:8px"><button class="ghost sm" data-act="unloadall">Розвантажити все швидко (−${boxes.length} хв)</button></div>` : ''}</div>`;
   }
   const out = G.parcels.filter(p => p.state === 'outgoing');
   const loaded = G.parcels.filter(p => p.state === 'loaded');
-  return `<div class="truck"><div class="truckcab"><span class="te">🚛</span><div><b>Вечірня машина за відправленнями</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span>. Натискай на посилки, щоб завантажити.</div></div></div>
+  return `${slot3d}<div class="truck"><div class="truckcab"><span class="te">🚛</span><div><b>Вечірня машина за відправленнями</b><div class="mute">Поїде о <span class="timer" id="truckleft">${hhmm(t.leaveAt)}</span>. Натискай на посилки, щоб завантажити.</div></div></div>
     <div class="mute">На відправку:</div><div class="pile" style="margin:6px 0 10px">${out.map(p => `<div class="parcel s${p.s}" data-act="load" data-id="${p.id}"><div class="pe">${p.e}</div><div class="tag">→ ${p.city}</div>${outTag(p)}</div>`).join('') || '<span class="mute">Все завантажено ✅</span>'}</div>
     <div class="truckbody">${loaded.map(p => `<div class="box s${p.s}">${p.e}<span>${p.city.slice(0,8)}</span></div>`).join('')}</div></div>`;
 }
@@ -2417,6 +2420,11 @@ function act(a, el){
       p.unl++; beep(400 + p.unl*120, 0.05, 'triangle');
       if (p.unl >= need){ p.state = 'pile'; G.stats.unloaded++; G.today.unloaded++; addXp(1); countTask('unload', 1); }
       dirty = true; return;
+    }
+    case 'unload3d': {
+      if (!G.truck) return;
+      if (G.truck.kind === 'in'){ const p = G.parcels.find(p => p.state === 'truck'); if (p) return act('unload', {dataset:{id:String(p.id)}}); return toast('Машина вже порожня ✅'); }
+      const o = G.parcels.find(p => p.state === 'outgoing'); if (o) return act('load', {dataset:{id:String(o.id)}}); return toast('Все завантажено ✅');
     }
     case 'unloadall': {
       const ps = G.parcels.filter(p => p.state === 'truck');

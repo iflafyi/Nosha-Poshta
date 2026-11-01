@@ -21,6 +21,15 @@ const RACK_X = i => -5.25 + i * 1.75;       // стелажі вздовж за�
 const SHELF_Y = [0.19, 0.74, 1.29, 1.84];
 const SLOT_X = [-0.57, -0.19, 0.19, 0.57];
 const CHAIR = j => [-6.25, -0.1 + j * 0.5];
+// підсобка за залом
+const BACK_Z = -4.6, BACK_END = -11.2;
+const DOOR_BACK = 6.2;                      // прохід зал ↔ склад (x)
+const GATE_Z = -7.9;                        // ворота рампи (z) у правій стіні
+const PILE = [5.6, -6.3], OUTCART = [5.6, -9.5];
+const TRUCK_DOCK = 9.25, TRUCK_AWAY = 19;
+const KITCHEN_DOOR = [-4.6, -7.6], WC_DOOR = [-2.0, -9.0];
+const inKitchen = (x, z) => x < -3.85 && z < -7.6;
+const inWC = (x, z) => x > -3.8 && x < -1.4 && z < -9.0;
 
 /* ---------- кеші ---------- */
 const cache = new Map();
@@ -68,7 +77,7 @@ function hash(str){ let h = 2166136261; for (const ch of String(str)) h = Math.i
 function buildRoom(){
   const S = R.scene;
   // плита-основа діорами
-  blk(17.6, 0.5, 10.4, 0x4a3b2e, 1.5, -0.53, 0);
+  blk(22.4, 0.5, 17.6, 0x4a3b2e, 3.3, -0.53, -3.4);
   // підлога-плитка
   const ft = canvasTex(128, 128, (c) => {
     c.fillStyle = '#e9e1d3'; c.fillRect(0, 0, 128, 128);
@@ -87,15 +96,21 @@ function buildRoom(){
   R.wallMat = new MeshLambertMaterial({color: 0xf1eee9});
   const wm = R.wallMat, H = 3.1, top = lam(0x3b2f26);
   const wall = (w, h, d, x, y0, z) => { mesh(boxG(w, h, d), wm, x, y0 + h / 2, z); mesh(boxG(w + 0.01, 0.04, d + 0.01), top, x, y0 + h + 0.02, z); };
-  wall(14.4, H, 0.2, 0, 0, -4.6);
+  R.sep = new Group(); S.add(R.sep);
+  const sepWall = (w, h, d, x, y0, z) => { mesh(boxG(w, h, d), wm, x, y0 + h / 2, z, R.sep); mesh(boxG(w + 0.01, 0.04, d + 0.01), top, x, y0 + h + 0.02, z, R.sep); };
+  sepWall(12.8, H, 0.2, -0.8, 0, -4.6);
+  sepWall(0.5, H, 0.2, 6.95, 0, -4.6);
+  mesh(boxG(1.0, H - 2.3, 0.2), wm, DOOR_BACK, 2.3 + (H - 2.3) / 2, -4.6, R.sep);
+  blk(1.04, 0.08, 0.26, 0x8f9aa3, DOOR_BACK, 2.22, -4.6, R.sep);
+  plane(0.9, 0.2, plateTex('СКЛАД', {w: 256, h: 56, bg: '#1f3a5f', font: 'bold 38px system-ui,sans-serif', r: 8}), DOOR_BACK, 2.48, -4.48, 0, R.sep);
   wall(0.2, H, 9.2, -7.1, 0, 0);
   wall(0.2, H, 5.4, 7.1, 0, -1.9);          // права стіна до дверей
   wall(0.2, H, 2.3, 7.1, 0, 3.35);          // після дверей
   mesh(boxG(0.2, H - 2.35, 1.4), wm, 7.1, 2.35 + (H - 2.35) / 2, 1.5); // над дверима
   // червона смуга і плінтус
   const red = lam(0xd7262b), base = lam(0x6b5444);
-  for (const [w, d, x, z] of [[14.2, 0.04, 0, -4.48], [0.04, 9, -6.98, 0], [0.04, 5.4, 6.98, -1.9], [0.04, 2.3, 6.98, 3.35]]){
-    mesh(boxG(w, 0.14, d), red, x, 1.0, z); mesh(boxG(w, 0.12, d), base, x, 0.06, z);
+  for (const [w, d, x, z] of [[12.7, 0.04, -0.85, -4.48], [0.04, 9, -6.98, 0], [0.04, 5.4, 6.98, -1.9], [0.04, 2.3, 6.98, 3.35]]){
+    mesh(boxG(w, 0.14, d), red, x, 1.0, z, z === -4.48 ? R.sep : null); mesh(boxG(w, 0.12, d), base, x, 0.06, z, z === -4.48 ? R.sep : null);
   }
   // вивіска
   const sign = canvasTex(1024, 200, (c) => {
@@ -104,8 +119,8 @@ function buildRoom(){
     c.fillStyle = '#fff'; c.font = 'bold 84px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('НП', 100, 104);
     c.fillStyle = '#d7262b'; c.font = 'bold 104px system-ui,sans-serif'; c.textAlign = 'left'; c.fillText('НАША ПОШТА', 210, 106);
   });
-  R.signMesh = plane(4.2, 0.82, sign, -0.4, 2.62, -4.48);
-  R.tierText = plane(2.4, 0.3, plateTex('', {w: 512, h: 64}), -0.4, 2.05, -4.48); R.tierText.visible = false;
+  R.signMesh = plane(4.2, 0.82, sign, -0.4, 2.62, -4.48, 0, R.sep);
+  R.tierText = plane(2.4, 0.3, plateTex('', {w: 512, h: 64}), -0.4, 2.05, -4.48, 0, R.sep); R.tierText.visible = false;
   // двері (розсувні)
   const glass = new MeshLambertMaterial({color: 0xbfe3f2, transparent: true, opacity: 0.38});
   const frame = lam(0x8f9aa3);
@@ -181,9 +196,9 @@ function buildStore(){
   for (const y of [0.1, 0.9]) blk(1.3, 0.05, 0.7, 0x8e7b5f, 0, y, 0, gb);
   plane(0.5, 0.2, plateTex('Г-…', {w: 160, h: 64, bg: '#7d3c98', font: 'bold 38px system-ui,sans-serif', r: 8}), 0, 1.6, 0.36, 0, gb);
   // піддон для купи з машини і візок вихідних
-  blk(1.3, 0.13, 1.0, 0xa98257, 5.35, 0, -3.65);
-  plane(1.0, 0.22, plateTex('З машини', {w: 320, h: 70, bg: '#f39c12', font: 'bold 40px system-ui,sans-serif', r: 10}), 5.35, 1.5, -4.48);
-  const cart = new Group(); cart.position.set(6.25, 0, -2.45); S.add(cart);
+  blk(1.3, 0.13, 1.0, 0xa98257, PILE[0], 0, PILE[1]);
+  { const pl = plane(1.0, 0.22, plateTex('З машини', {w: 320, h: 70, bg: '#f39c12', font: 'bold 40px system-ui,sans-serif', r: 10}), PILE[0], 1.6, PILE[1] + 0.55); mesh(new CylinderGeometry(0.012, 0.012, 1.5), lam(0x555555), PILE[0] - 0.45, 0.75, PILE[1] + 0.52); void pl; }
+  const cart = new Group(); cart.position.set(OUTCART[0], 0, OUTCART[1]); S.add(cart);
   blk(0.9, 0.05, 0.7, 0x7f8c8d, 0, 0.12, 0, cart);
   for (const x of [-0.4, 0.4]) for (const z of [-0.3, 0.3]) mesh(new CylinderGeometry(0.05, 0.05, 0.04, 8), lam(0x222222), x, 0.05, z, cart).rotation.z = Math.PI / 2;
   blk(0.04, 1.0, 0.7, 0x7f8c8d, 0.43, 0.15, 0, cart);
@@ -207,7 +222,7 @@ function placeBoxes(G){
   for (const p of G.parcels || []){
     if (p.state === 'cell'){ if (String(p.cell || '').startsWith('Г')) big++; else small++; }
     else if (p.state === 'pile') pile++;
-    else if (p.state === 'outgoing' || p.state === 'loaded') out++;
+    else if (p.state === 'outgoing') out++;
   }
   const racks = clamp(G.up.shelves || 1, 1, 5);
   R.racks.forEach((g, i) => { g.visible = i < racks; });
@@ -234,17 +249,156 @@ function placeBoxes(G){
   const np = Math.min(pile, 36);
   for (let k = 0; k < np; k++){
     const layer = Math.floor(k / 9), j = k % 9;
-    dummy.position.set(5.35 + ((j % 3) - 1) * 0.39 + (r() - 0.5) * 0.06, 0.13 + 0.15 + layer * 0.3, -3.65 + (Math.floor(j / 3) - 1) * 0.3); dummy.rotation.set(0, (r() - 0.5) * 0.5, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+    dummy.position.set(PILE[0] + ((j % 3) - 1) * 0.39 + (r() - 0.5) * 0.06, 0.13 + 0.15 + layer * 0.3, PILE[1] + (Math.floor(j / 3) - 1) * 0.3); dummy.rotation.set(0, (r() - 0.5) * 0.5, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
     R.boxPile.setMatrixAt(k, dummy.matrix);
   }
   R.boxPile.count = np; R.boxPile.instanceMatrix.needsUpdate = true;
   const no = Math.min(out, 24);
   for (let k = 0; k < no; k++){
     const layer = Math.floor(k / 6), j = k % 6;
-    dummy.position.set(6.25 + ((j % 2) - 0.5) * 0.36, 0.17 + 0.13 + layer * 0.27, -2.45 + (Math.floor(j / 2) - 1) * 0.22); dummy.rotation.set(0, (r() - 0.5) * 0.4, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+    dummy.position.set(OUTCART[0] + ((j % 2) - 0.5) * 0.36, 0.17 + 0.13 + layer * 0.27, OUTCART[1] + (Math.floor(j / 2) - 1) * 0.22); dummy.rotation.set(0, (r() - 0.5) * 0.4, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
     R.boxOut.setMatrixAt(k, dummy.matrix);
   }
   R.boxOut.count = no; R.boxOut.instanceMatrix.needsUpdate = true;
+}
+
+/* ---------- підсобка: склад, рампа, пакування, кухня, туалет ---------- */
+function buildBack(){
+  const S = R.scene, H = 3.1, wm = R.wallMat, top = lam(0x3b2f26);
+  const wall = (w, h, d, x, y0, z, m) => { mesh(boxG(w, h, d), m || wm, x, y0 + h / 2, z); mesh(boxG(w + 0.01, 0.04, d + 0.01), top, x, y0 + h + 0.02, z); };
+  const zc = (BACK_Z + BACK_END) / 2, depth = BACK_Z - BACK_END;
+  // підлога: бетон складу
+  const ct = canvasTex(128, 128, (c) => { c.fillStyle = '#b9b6b0'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#a7a39c'; c.lineWidth = 2; c.strokeRect(0, 0, 128, 128);
+    for (let i = 0; i < 60; i++){ c.fillStyle = `rgba(80,70,60,${Math.random() * 0.08})`; c.fillRect(Math.random() * 128, Math.random() * 128, 3, 3); } });
+  ct.wrapS = ct.wrapT = RepeatWrapping; ct.repeat.set(7, 3.3);
+  const fl = new Mesh(new PlaneGeometry(14.2, depth), new MeshLambertMaterial({map: ct})); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0.001, zc); S.add(fl);
+  // жовта розмітка проходу і зона рампи
+  for (const [w, d, x, z] of [[8.4, 0.08, 2.8, -5.15], [0.08, 4.2, 4.6, -7.9], [2.4, 0.08, 5.8, -5.7], [2.4, 0.08, 5.8, -10.1]]) blk(w, 0.004, d, 0xf1c40f, x, 0.002, z);
+  // зовнішні стіни підсобки
+  wall(0.2, H, depth, -7.1, 0, zc);
+  wall(14.4, H, 0.2, 0, 0, BACK_END);
+  const gz0 = GATE_Z - 1.05, gz1 = GATE_Z + 1.05;               // проріз воріт
+  wall(0.2, H, gz0 - BACK_END, 7.1, 0, (gz0 + BACK_END) / 2);
+  wall(0.2, H, BACK_Z - gz1, 7.1, 0, (gz1 + BACK_Z) / 2);
+  mesh(boxG(0.2, 0.55, 2.1), wm, 7.1, H - 0.275, GATE_Z);
+  // ворота-ролета
+  R.gate = mesh(boxG(0.08, 2.5, 2.08), lam(0x95a5a6), 7.15, 1.27, GATE_Z);
+  R.gateLines = []; for (let y = 0.2; y < 2.5; y += 0.22) R.gateLines.push(blk(0.09, 0.02, 2.08, 0x7f8c8d, 0, y - 1.27, 0, R.gate));
+  R.gateOpen = 0;
+  plane(1.2, 0.24, plateTex('РАМПА', {w: 320, h: 64, bg: '#f39c12', font: 'bold 40px system-ui,sans-serif', r: 8}), 6.98, 2.75, GATE_Z, -Math.PI / 2);
+  // світлофор рампи
+  R.dockLight = mesh(new SphereGeometry(0.07, 8, 6), new MeshBasicMaterial({color: 0xe74c3c}), 6.97, 2.25, GATE_Z - 1.3);
+  // --- склад: великі стелажі резерву вздовж задньої стіни
+  const tones = [0xc9a26b, 0xb98d56, 0xd4b483, 0xa87b4b, 0xe8e2d6, 0xc49a6c], r = rng(21);
+  for (let i = 0; i < 3; i++){
+    const g = new Group(); g.position.set(-0.2 + i * 2.2, 0, -10.55); S.add(g);
+    for (const x of [-0.95, 0.95]) for (const z of [-0.33, 0.33]) blk(0.08, 2.6, 0.08, 0x2471a3, x, 0, z, g);
+    for (const y of [0.15, 0.95, 1.75]){
+      blk(1.98, 0.06, 0.7, 0xe67e22, 0, y, 0, g);
+      let x = -0.75; while (x < 0.8){ const w = 0.28 + r() * 0.25, h = 0.25 + r() * 0.4; if (r() < 0.85) mesh(boxG(w, h, 0.5), lam(tones[Math.floor(r() * tones.length)]), x + w / 2, y + 0.06 + h / 2, (r() - 0.5) * 0.1, g); x += w + 0.05; }
+    }
+    plane(0.7, 0.18, plateTex(`Резерв ${String.fromCharCode(65 + i)}`, {w: 256, h: 64, bg: '#2471a3', font: 'bold 34px system-ui,sans-serif', r: 8}), 0, 2.45, 0.36, 0, g);
+  }
+  // стіл сортування з роликовим конвеєром
+  const sort = new Group(); sort.position.set(2.2, 0, -7.3); S.add(sort);
+  blk(2.4, 0.06, 0.85, 0x7f8c8d, 0, 0.82, 0, sort);
+  for (const x of [-1.1, 1.1]) for (const z of [-0.36, 0.36]) blk(0.06, 0.82, 0.06, 0x555555, x, 0, z, sort);
+  for (let x = -1.1; x <= 1.1; x += 0.16) mesh(new CylinderGeometry(0.035, 0.035, 0.8, 8), lam(0xbdc3c7), x, 0.91, 0, sort).rotation.x = Math.PI / 2;
+  R.sortBoxes = [0, 1, 2].map(i => { const b = blk(0.34, 0.26, 0.32, tones[i + 1], -0.8 + i * 0.7, 0.94, 0, sort); b._x = -0.8 + i * 0.7; return b; });
+  plane(1.1, 0.22, plateTex('Сортування', {w: 320, h: 64, bg: '#16a085', font: 'bold 38px system-ui,sans-serif', r: 8}), 0, 1.75, -0.4, 0, sort);
+  // рокла біля воріт
+  const jack = new Group(); jack.position.set(4.4, 0, -9.0); jack.rotation.y = 0.4; S.add(jack);
+  blk(0.55, 0.08, 1.1, 0xe74c3c, 0, 0.06, 0, jack); mesh(new CylinderGeometry(0.02, 0.02, 1.0), lam(0x333333), 0, 0.6, -0.6, jack).rotation.x = 0.25;
+  // --- зона пакування
+  const pz = new Mesh(new PlaneGeometry(5.6, 2.8), lam(0xd8cfc0)); pz.rotation.x = -Math.PI / 2; pz.position.set(-4.3, 0.003, -6.05); S.add(pz);
+  plane(1.4, 0.26, plateTex('Пакування', {w: 384, h: 72, bg: '#8e44ad', font: 'bold 42px system-ui,sans-serif', r: 10}), -6.98, 2.4, -5.6, Math.PI / 2);
+  for (const tx of [-5.6, -3.2]){
+    const t = new Group(); t.position.set(tx, 0, -5.5); S.add(t);
+    blk(1.6, 0.06, 0.8, 0xd5b98a, 0, 0.86, 0, t);
+    for (const x of [-0.75, 0.75]) for (const z of [-0.35, 0.35]) blk(0.05, 0.86, 0.05, 0x6b5444, x, 0, z, t);
+    blk(0.18, 0.12, 0.08, 0xc0392b, -0.55, 0.92, 0.2, t);                    // скотч
+    mesh(new CylinderGeometry(0.16, 0.16, 0.5, 14), new MeshLambertMaterial({color: 0xd6eaf8, transparent: true, opacity: 0.8}), 0.5, 1.08, 0.15, t).rotation.z = Math.PI / 2; // плівка
+    blk(0.5, 0.3, 0.4, 0xc9a26b, -0.05, 0.92, -0.05, t);
+    blk(0.4, 0.04, 0.36, 0x9aa5ad, 0.55, 0.92, -0.2, t);                     // ваги
+  }
+  // стелаж з порожніми коробками
+  const bx = new Group(); bx.position.set(-6.65, 0, -6.6); S.add(bx);
+  for (const y of [0.05, 0.75, 1.45]){ blk(0.6, 0.04, 1.4, 0x8e7b5f, 0, y, 0, bx); for (let k = 0; k < 3; k++) blk(0.5, 0.06 + k * 0.02, 0.4, 0xc9a26b, 0, y + 0.04 + k * 0.08, -0.4 + k * 0.4, bx); }
+  for (const z of [-0.68, 0.68]) blk(0.05, 1.7, 0.05, 0x5d6d7e, 0.28, 0, z, bx);
+  // --- кухня
+  const iw = (w, d, x, z) => wall(w, 2.3, d, x, 0, z);
+  iw(2.1, 0.12, -6.05, -7.6); iw(0.4, 0.12, -4.05, -7.6);          // перегородка з дверима
+  iw(0.12, 3.6, -3.85, -9.4);
+  const kf = new Mesh(new PlaneGeometry(3.2, 3.6), lam(0xe8d8c3)); kf.rotation.x = -Math.PI / 2; kf.position.set(-5.5, 0.004, -9.4); S.add(kf);
+  plane(1.0, 0.24, plateTex('☕ Кухня', {w: 320, h: 72, bg: '#d35400', font: 'bold 40px system-ui,sans-serif', r: 10}), -5.5, 2.15, -7.53);
+  blk(0.75, 0.06, 0.75, 0xa0522d, -5.6, 0.74, -9.5); mesh(new CylinderGeometry(0.05, 0.05, 0.74, 8), lam(0x6b5444), -5.6, 0.37, -9.5);
+  R.kChairs = [[-6.15, -9.5, Math.PI / 2], [-5.05, -9.5, -Math.PI / 2]].map(([x, z, ry]) => { const g = new Group(); g.position.set(x, 0, z); g.rotation.y = ry; S.add(g);
+    blk(0.38, 0.05, 0.38, 0x2e86c1, 0, 0.45, 0, g); blk(0.38, 0.4, 0.05, 0x2e86c1, 0, 0.48, -0.17, g); for (const a of [-0.15, 0.15]) for (const b of [-0.15, 0.15]) blk(0.035, 0.45, 0.035, 0x555555, a, 0, b, g); return [x, z, ry]; });
+  { const m = mesh(new CylinderGeometry(0.05, 0.04, 0.09, 10), lam(0xffffff), -5.5, 0.82, -9.4); void m; }
+  blk(0.6, 1.8, 0.6, 0xf2f3f4, -6.7, 0, -10.75);                                 // холодильник
+  blk(0.02, 0.5, 0.04, 0x95a5a6, -6.42, 1.1, -10.44);
+  blk(2.0, 0.9, 0.6, 0xf6f4f0, -5.0, 0, -10.8); blk(2.05, 0.05, 0.64, 0x5d6d7e, -5.0, 0.9, -10.8); // тумба
+  blk(0.45, 0.28, 0.32, 0x2c3e50, -5.45, 0.95, -10.85);                          // мікрохвильовка
+  R.kettle = mesh(new CylinderGeometry(0.1, 0.12, 0.22, 12), lam(0xecf0f1), -4.6, 1.06, -10.8);
+  R.steam = emojiSprite('💨', 0.3); R.steam.position.set(-4.6, 1.45, -10.8); R.steam.visible = false; S.add(R.steam);
+  blk(0.4, 0.04, 0.3, 0xbdc3c7, -4.25, 0.94, -10.8);                              // мийка
+  // --- туалет
+  iw(1.55, 0.12, -3.05, -9.0); iw(0.25, 0.12, -1.5, -9.0); iw(0.12, 2.2, -1.4, -10.1);
+  const tf = new Mesh(new PlaneGeometry(2.4, 2.2), lam(0xf2f4f4)); tf.rotation.x = -Math.PI / 2; tf.position.set(-2.6, 0.005, -10.1); S.add(tf);
+  R.wcDoor = new Group(); R.wcDoor.position.set(-2.22, 0, -9.0); S.add(R.wcDoor);
+  blk(0.5, 2.0, 0.05, 0x8d6e63, 0.25, 0, 0, R.wcDoor);
+  R.wcSign = plane(0.5, 0.22, plateTex('🚻 вільно', {w: 220, h: 96, bg: '#2e7d32', font: 'bold 40px system-ui,sans-serif', r: 10}), -2.6, 2.05, -8.93);
+  const toilet = new Group(); toilet.position.set(-2.9, 0, -10.75); S.add(toilet);
+  mesh(new CylinderGeometry(0.2, 0.16, 0.4, 12), lam(0xffffff), 0, 0.2, 0.05, toilet); blk(0.42, 0.45, 0.18, 0xffffff, 0, 0.3, -0.18, toilet);
+  blk(0.45, 0.06, 0.35, 0xffffff, -1.05 + 1.95, 0.8, 0.1, toilet);               // умивальник
+  blk(0.4, 0.5, 0.02, 0xd6eaf8, 0.9, 1.25, -0.08, toilet);                       // дзеркало
+  // двір і під’їзд для машини
+  const yd = new Mesh(new PlaneGeometry(7, 7.6), lam(0x8c8c88)); yd.rotation.x = -Math.PI / 2; yd.position.set(10.7, 0.001, -8.4); S.add(yd);
+  for (let x = 8.0; x < 14; x += 1.4) blk(0.6, 0.006, 0.1, 0xf5f5f5, x, 0, -6.7);
+  blk(0.9, 0.5, 2.4, 0x5d6d7e, 7.6, 0, GATE_Z);                                   // рампа-платформа
+  for (const z of [GATE_Z - 1.15, GATE_Z + 1.15]) blk(0.22, 0.32, 0.3, 0x1b1b1b, 8.05, 0.12, z); // відбійники
+}
+function buildTruck(){
+  const T = R.truck = new Group(); R.scene.add(T);
+  const body = new Group(); T.add(body);
+  blk(3.5, 2.05, 2.0, 0xf6f6f6, 0, 0.62, 0, body);
+  blk(3.52, 0.22, 2.02, 0xd7262b, 0, 0.62, 0, body);
+  for (const sd of [-1.015, 1.015]){
+    plane(2.4, 0.55, plateTex('НАША ПОШТА', {w: 640, h: 140, bg: '#ffffff', fg: '#d7262b', font: 'bold 96px system-ui,sans-serif', r: 6}), 0.2, 1.9, sd, sd > 0 ? 0 : Math.PI, body);
+  }
+  blk(3.6, 0.18, 1.6, 0x2c2c2c, 0.6, 0.38, 0, T);                                 // рама
+  const cab = new Group(); cab.position.set(2.3, 0, 0); T.add(cab);
+  blk(1.15, 1.55, 1.95, 0xd7262b, 0, 0.55, 0, cab);
+  blk(0.04, 0.6, 1.7, 0x9fd3ea, 0.58, 1.35, 0, cab);
+  for (const z of [-0.98, 0.98]) blk(0.6, 0.45, 0.02, 0x9fd3ea, 0.05, 1.4, z, cab);
+  blk(0.1, 0.18, 1.6, 0x333333, 0.6, 0.6, 0, cab);
+  R.wheels = [];
+  for (const [x, z] of [[-1.0, -0.95], [-1.0, 0.95], [0.2, -0.95], [0.2, 0.95], [2.4, -0.95], [2.4, 0.95]]){
+    const w = mesh(new CylinderGeometry(0.34, 0.34, 0.24, 14), lam(0x1b1b1b), x, 0.34, z, T); w.rotation.x = Math.PI / 2; R.wheels.push(w);
+  }
+  // задні двері
+  R.tDoors = [-1, 1].map(h => { const p = new Group(); p.position.set(-1.77, 0.62, h); p._h = h; T.add(p);
+    blk(0.04, 2.0, 0.99, 0xe5e5e5, 0, 0, -h * 0.495, p); return p; });
+  // коробки в кузові
+  R.truckBoxes = new InstancedMesh(new BoxGeometry(0.36, 0.3, 0.36), new MeshLambertMaterial({color: 0xffffff}), 40); R.truckBoxes.count = 0; T.add(R.truckBoxes);
+  const tones = [0xc9a26b, 0xb98d56, 0xd4b483, 0xa87b4b, 0xe8e2d6], r = rng(31), col = new Color();
+  for (let i = 0; i < 40; i++){ col.set(tones[Math.floor(r() * tones.length)]); R.truckBoxes.setColorAt(i, col); }
+  // водій
+  R.driver = makePerson('driver', '🧔', {seed: 42});
+  R.driver.cap = blk(0.3, 0.06, 0.3, 0xd7262b, 0, 1.92, 0, R.driver.g);
+  R.driver.g.visible = false;
+  T.position.set(TRUCK_AWAY, 0, GATE_Z); T.visible = false;
+  R.tx = TRUCK_AWAY; R.tState = 'away'; R.tDoor = 0;
+}
+function placeTruckBoxes(n){
+  if (R._tbn === n) return; R._tbn = n;
+  const r = rng(13), k = Math.min(n, 40);
+  for (let i = 0; i < k; i++){
+    const layer = Math.floor(i / 15), j = i % 15;
+    dummy.position.set(-1.45 + Math.floor(j / 5) * 0.42 + (r() - 0.5) * 0.04, 0.8 + layer * 0.32, -0.75 + (j % 5) * 0.38); dummy.rotation.set(0, (r() - 0.5) * 0.3, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+    R.truckBoxes.setMatrixAt(i, dummy.matrix);
+  }
+  R.truckBoxes.count = k; R.truckBoxes.instanceMatrix.needsUpdate = true;
 }
 
 /* ---------- покращення і декор ---------- */
@@ -335,6 +489,22 @@ function buildExtras(){
   R.catLegs = [[-0.07, 0.15], [0.07, 0.15], [-0.07, -0.15], [0.07, -0.15]].map(([x, z]) => { const p = new Group(); p.position.set(x, 0.12, z); cat.add(p); blk(0.05, 0.12, 0.05, 0xd35400, 0, -0.12, 0, p); return p; });
   mesh(new CircleGeometry(0.22, 12), new MeshBasicMaterial({color: 0, transparent: true, opacity: 0.18}), 0, 0.01, 0, cat).rotation.x = -Math.PI / 2;
   R.catSt = {pos: new Vector3(-2, 0, 3), tgt: new Vector3(-2, 0, 3), wait: 2, yaw: 0, ph: 0, jump: 0};
+  // святковий декор
+  D.tree = grp(-6.3, 0, 3.6);
+  mesh(new CylinderGeometry(0.08, 0.1, 0.3, 8), lam(0x6d4c41), 0, 0.15, 0, D.tree);
+  [[0.75, 0.9, 0.5], [0.6, 0.75, 1.05], [0.42, 0.6, 1.55], [0.24, 0.45, 1.98]].forEach(([rr_, h, y]) => mesh(new ConeGeometry(rr_, h, 12), lam(0x1e8449), 0, y, 0, D.tree));
+  { const st = emojiSprite('⭐', 0.35); st.position.set(0, 2.35, 0); D.tree.add(st); }
+  R.treeBalls = [];
+  for (let i = 0; i < 14; i++){ const a = i * 2.4, y = 0.45 + (i / 14) * 1.6, rad = 0.7 - (i / 14) * 0.5; const b = mesh(new SphereGeometry(0.055, 8, 6), new MeshBasicMaterial({color: [0xe74c3c, 0xf1c40f, 0x3498db, 0xecf0f1][i % 4]}), Math.cos(a) * rad, y, Math.sin(a) * rad, D.tree); R.treeBalls.push(b); }
+  D.presents = grp(-5.65, 0, 3.95);
+  [[0, 0, 0xe74c3c, 0.34], [0.36, 0.1, 0x3498db, 0.26], [0.1, 0.36, 0xf1c40f, 0.22]].forEach(([x, z, c, s_]) => { blk(s_, s_, s_, c, x, 0, z, D.presents); blk(s_ + 0.01, s_ + 0.01, 0.05, 0xffffff, x, 0, z, D.presents); });
+  D.garland = grp(0, 0, 0);
+  R.garland = [];
+  for (let i = 0; i < 28; i++){ const x = -6.8 + i * 0.5, b = mesh(new SphereGeometry(0.045, 6, 4), new MeshBasicMaterial({color: [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x3498db][i % 4]}), x, 2.95 - Math.abs(Math.sin(i * 0.9)) * 0.18, -1.32, D.garland); R.garland.push(b); }
+  D.snowman = grp(8.1, 0, 3.4);
+  for (const [y, r_] of [[0.3, 0.32], [0.82, 0.24], [1.22, 0.17]]) mesh(new SphereGeometry(r_, 12, 10), lam(0xffffff), 0, y, 0, D.snowman);
+  { const n = mesh(new ConeGeometry(0.04, 0.18, 8), lam(0xe67e22), -0.17, 1.22, 0, D.snowman); n.rotation.z = Math.PI / 2; }
+  blk(0.26, 0.2, 0.26, 0x222222, 0, 1.36, 0, D.snowman);
   // святкові кульки
   E.balloons = grp(2.95, 0, -1.3);
   [[0, 2.3, 0, 0xe74c3c], [0.25, 2.15, 0.12, 0xf1c40f], [-0.2, 2.2, 0.1, 0x3498db]].forEach(([x, y, z, c]) => {
@@ -419,6 +589,13 @@ function sync(){
   if (!G) return;
   ensureLoop();
   const now = performance.now();
+  const tab = br.tab();
+  if (tab !== R.lastTab){ R.lastTab = tab; R.userMode = false; setMode(tab === 'store' || tab === 'ramp' ? 'back' : 'hall'); }
+  // машина на рампі
+  const tr = G.truck, tWant = tr ? (tr.kind === 'in' ? 'in' : 'out') : null;
+  if (tWant && (R.tState === 'away' || R.tState === 'leaving')){ R.tState = 'arriving'; R.tKind = tWant; R.truck.visible = true; if (R.tx > 16) R.tx = TRUCK_AWAY; }
+  if (!tWant && (R.tState === 'docked' || R.tState === 'arriving')) R.tState = 'leaving';
+  R.tCount = (G.parcels || []).filter(p => p.state === (R.tKind === 'out' ? 'loaded' : 'truck')).length;
   const wins = clamp(G.up.windows || 1, 1, 4), front = frontStaff(G);
   // віконця
   R.wins.forEach((w, k) => {
@@ -460,7 +637,7 @@ function sync(){
         P.pos.set(WX(w.w + 1), 0, OP_Z); P.yaw = 0; P.face = 0; P.sit = true; P.drop = 0.1; P.goal = [WX(w.w + 1), OP_Z];
       } else if (w.kind === 'store'){
         P = makePerson(key, w.st.av, {uniform: true});
-        P.pos.set(2.0 + Math.random() * 2, 0, -3.2); P.wait = 0;
+        P.pos.set(2.0 + Math.random() * 2, 0, -3.2); P.wait = 0; P.zone = 'hall';
       } else {
         P = makePerson(key, '🕵️', {seed: 77}); P.pos.set(STREET, 0, -4); P.path = [[STREET, DOOR.z], DOOR_IN]; P.goal = [4.6, 3.6]; P.face = Math.PI;
         P.clip = blk(0.22, 0.3, 0.02, 0xffffff, 0.15, 1.0, 0.25, P.g); P.clip.rotation.x = -0.5;
@@ -469,6 +646,7 @@ function sync(){
     }
     P.mark = now;
     if (w.kind === 'op'){ P.busy = !!w.st.cl; }
+    if (w.kind === 'store'){ P.stRef = w.st; }
     if (w.kind === 'client'){
       const c = w.c;
       if (c.by){
@@ -516,8 +694,9 @@ function syncSlow(G, br){
   const items = (G.decor && G.decor.items) || {};
   for (const k in R.decor) R.decor[k].visible = !!items[k];
   const E = R.extras, U = G.up;
+  if (R.mode !== 'hall'){ R.decor.clock.visible = false; R.decor.flag.visible = false; }
   E.chairs.forEach((c, j) => { c.visible = j < (U.chairs || 0) * 3; });
-  E.coffee.visible = !!U.coffee; E.ac.visible = !!U.ac; E.gen.visible = !!U.gen; E.ads.visible = !!U.ads;
+  E.coffee.visible = !!U.coffee; E.ac.visible = !!U.ac && R.mode === 'hall'; E.gen.visible = !!U.gen; E.ads.visible = !!U.ads;
   E.locker.visible = !!U.locker;
   if (U.locker){ const w = 0.6 + U.locker * 0.4; E.lockerBody.scale.z = w; E.lockerGrid.scale.x = w * 0.85; E.locker.position.z = 2.4 + w / 2; }
   R.scanner.visible = !!U.scanner;
@@ -552,6 +731,23 @@ function animate(dt){
   R.doorL.position.z = 1.15 - R.doorOpen * 0.62; R.doorR.position.z = 1.85 + R.doorOpen * 0.62;
   // кіт
   if (R.decor.cat.visible) catAI(dt, spd);
+  // машина, ворота, рампа
+  truckAnim(dt, spd);
+  const gWant = (R.tState === 'docked' || (R.tState === 'arriving' && R.tx < 13)) ? 1 : 0;
+  R.gateOpen += (gWant - R.gateOpen) * Math.min(1, dt * 2.5);
+  { const sc = 1 - 0.88 * R.gateOpen; R.gate.scale.y = sc; R.gate.position.y = 2.52 - 1.25 * sc; }
+  R.dockLight.material.color.set(R.tState === 'docked' ? 0x2ecc71 : 0xe74c3c);
+  // кухня і туалет
+  const kitchenBusy = [...R.people.values()].some(P => P.sit && inKitchen(P.pos.x, P.pos.z));
+  R.steam.visible = kitchenBusy; if (kitchenBusy){ R.steam.position.y = 1.45 + (R.t * 0.4) % 0.3; R.steam.material.opacity = 1 - ((R.t * 0.4) % 0.3) / 0.3; }
+  const wcBusy = [...R.people.values()].some(P => P.inWC === 2);
+  R.wcDoor.rotation.y = wcBusy ? 0 : -1.3 * Math.min(1, 1);
+  if (R._wcb !== wcBusy){ R._wcb = wcBusy; R.wcSign.material.map = plateTex(wcBusy ? '🚻 зайнято' : '🚻 вільно', {w: 220, h: 96, bg: wcBusy ? '#c0392b' : '#2e7d32', font: 'bold 40px system-ui,sans-serif', r: 10}); R.wcSign.material.needsUpdate = true; }
+  // святкові вогники
+  if (R.decor.garland.visible) R.garland.forEach((b, i) => { b.visible = Math.sin(R.t * 3 + i * 1.7) > -0.3; });
+  if (R.decor.tree.visible) R.treeBalls.forEach((b, i) => { b.visible = Math.sin(R.t * 2.2 + i * 2.1) > -0.5; });
+  // коробки на сортуванні їдуть по роликах
+  R.sortBoxes.forEach((b, i) => { b.position.x = -1.0 + ((R.t * 0.25 * Math.max(spd, 0.2) + i * 0.7) % 2.1); });
   // риби
   if (R.decor.aquarium.visible) R.fish.forEach(f => { f._p += dt * (0.6 + f.id % 3 * 0.2); f.position.z = Math.sin(f._p) * 0.42; f.rotation.y = Math.cos(f._p) > 0 ? 0 : Math.PI; });
   // годинник
@@ -577,16 +773,79 @@ function animate(dt){
   // підказка
   if (R.hint && R.t > 6 && !R.hint.hidden){ R.hint.hidden = true; }
 }
+// маршрут через двері: зал ↔ склад, кухня, туалет
+function routeTo(P, x, z){
+  const fx = P.pos.x, fz = P.pos.z, path = [];
+  if (inKitchen(fx, fz)) path.push([KITCHEN_DOOR[0], -8.2], [KITCHEN_DOOR[0], -7.1]);
+  if (inWC(fx, fz)) path.push([WC_DOOR[0], -9.5], [WC_DOOR[0], -8.5]);
+  const fHall = fz > BACK_Z, tHall = z > BACK_Z;
+  if (fHall && !tHall) path.push([DOOR_BACK, -3.55], [DOOR_BACK, -5.4]);
+  if (!fHall && tHall) path.push([DOOR_BACK, -5.4], [DOOR_BACK, -3.55]);
+  if (inKitchen(x, z)) path.push([KITCHEN_DOOR[0], -7.1], [KITCHEN_DOOR[0], -8.2]);
+  if (inWC(x, z)) path.push([WC_DOOR[0], -8.5], [WC_DOOR[0], -9.5]);
+  P.path = path; P.goal = [x, z];
+}
+function chooseSpot(P){
+  const G = B().g(), racks = clamp(G.up.shelves || 1, 1, 5), st = P.stRef || {};
+  const docked = R.tState === 'docked', r = Math.random(), rnd = (a) => (Math.random() - 0.5) * a;
+  const rack = () => ({x: RACK_X(Math.floor(Math.random() * racks)) + rnd(0.8), z: -3.35, face: Math.PI, carry: false});
+  if (docked && R.tKind === 'in' && R.tCount > 0 && r < 0.75)
+    return {x: 7.45, z: GATE_Z + rnd(0.9), face: Math.PI / 2, carry: false, wait: 0.7, chain: [{x: PILE[0] - 0.9, z: PILE[1] + rnd(0.5), face: Math.PI / 2, carry: true, wait: 0.5}]};
+  const outN = (G.parcels || []).filter(p => p.state === 'outgoing').length;
+  if (docked && R.tKind === 'out' && outN > 0 && r < 0.75)
+    return {x: OUTCART[0] - 0.85, z: OUTCART[1] + rnd(0.4), face: Math.PI / 2, carry: false, wait: 0.5, chain: [{x: 7.45, z: GATE_Z + rnd(0.9), face: Math.PI / 2, carry: true, wait: 0.6}]};
+  if ((st.fat || 0) > 55 && r < 0.3){
+    const used = new Set([...R.people.values()].filter(q => q !== P && q.goal).map(q => q.goal.join()));
+    const ch = R.kChairs.find(c => !used.has(`${c[0]},${c[1]}`));
+    if (ch) return {x: ch[0], z: ch[1], face: ch[2], carry: false, sit: true, mood: '☕', wait: 5 + Math.random() * 4};
+  }
+  if (r < 0.05 && !R.wcBusy && ![...R.people.values()].some(q => q.inWC)) return {x: -2.85, z: -10.2, face: 0, carry: false, wc: true, wait: 3};
+  const pool = [
+    () => ({x: PILE[0] - 0.9, z: PILE[1] + rnd(0.5), face: Math.PI / 2, carry: false, wait: 0.8, chain: [{...rack(), carry: true}]}),
+    rack, rack,
+    () => ({x: 3.6 + rnd(0.6), z: -3.3, face: Math.PI, carry: false}),
+    () => ({x: 2.2 + rnd(1.6), z: -6.65, face: Math.PI, carry: false, wait: 2 + Math.random() * 2}),
+    () => ({x: -0.2 + Math.floor(Math.random() * 3) * 2.2 + rnd(0.8), z: -9.75, face: Math.PI, carry: false}),
+    () => ({x: [-5.6, -3.2][Math.floor(Math.random() * 2)] + rnd(0.4), z: -4.95, face: Math.PI, carry: false, wait: 2 + Math.random() * 2}),
+    () => ({x: OUTCART[0] - 0.85, z: OUTCART[1] + rnd(0.4), face: Math.PI / 2, carry: true}),
+  ];
+  return pool[Math.floor(Math.random() * pool.length)]();
+}
 function storeAI(P, dt, spd){
-  if (P.goal && Math.hypot(P.goal[0] - P.pos.x, P.goal[1] - P.pos.z) > 0.05) return;
+  const arrived = !P.path.length && (!P.goal || Math.hypot(P.goal[0] - P.pos.x, P.goal[1] - P.pos.z) <= 0.05);
+  if (!arrived) return;
+  if (P.inWC === 1){ P.inWC = 2; P.g.visible = false; }
   P.wait = (P.wait || 0) - dt * spd;
   if (P.wait > 0) return;
-  const br = B(), G = br.g(), racks = clamp(G.up.shelves || 1, 1, 5);
-  const spots = [[5.35, -2.9, 'pile'], [3.6, -3.3, 'big'], [6.0, -2.0, 'out']];
-  for (let i = 0; i < racks; i++) spots.push([RACK_X(i) + (Math.random() - 0.5) * 0.8, -3.35, 'rack']);
-  const s = spots[Math.floor(Math.random() * spots.length)];
-  if (s[2] === 'pile') P.carry.visible = true; else if (s[2] === 'rack') P.carry.visible = false;
-  P.goal = [s[0], s[1]]; P.face = s[2] === 'out' ? Math.PI / 2 : Math.PI; P.wait = 1 + Math.random() * 2.5;
+  if (P.inWC === 2){ P.inWC = 0; P.g.visible = true; }
+  P.sit = false; P.mood.visible = false;
+  const s = P.chain && P.chain.length ? P.chain.shift() : chooseSpot(P);
+  if (s.chain) P.chain = s.chain;
+  P.carry.visible = !!s.carry;
+  routeTo(P, s.x, s.z); P.face = s.face; P.wait = s.wait ?? (1 + Math.random() * 2.5);
+  if (s.sit){ P.sit = true; P.drop = 0.25; }
+  if (s.mood){ P.mood.visible = true; setEmoji(P.mood, s.mood); }
+  if (s.wc) P.inWC = 1;
+}
+function truckAnim(dt, spd){
+  if (R.tState === 'away') return;
+  const mv = Math.max(spd, 1);
+  if (R.tState === 'arriving' || R.tState === 'docked'){
+    const d = TRUCK_DOCK - R.tx;
+    if (Math.abs(d) > 0.01){ R.tx += Math.sign(d) * Math.min(Math.abs(d), Math.max(0.5, Math.abs(d) * 1.4) * dt * mv); R.wheels.forEach(w => { w.rotation.y += dt * 6 * mv; }); }
+    else { R.tx = TRUCK_DOCK; R.tState = 'docked'; }
+    R.tDoor += ((R.tState === 'docked' ? 1 : 0) - R.tDoor) * Math.min(1, dt * 3);
+  } else if (R.tState === 'leaving'){
+    R.tDoor += (0 - R.tDoor) * Math.min(1, dt * 4);
+    if (R.tDoor < 0.03){ R.tx += Math.max(0.6, (R.tx - TRUCK_DOCK) * 1.3 + 0.6) * dt * mv; R.wheels.forEach(w => { w.rotation.y -= dt * 6 * mv; }); }
+    if (R.tx >= TRUCK_AWAY){ R.tx = TRUCK_AWAY; R.tState = 'away'; R.truck.visible = false; }
+  }
+  R.truck.position.x = R.tx;
+  R.tDoors.forEach(p => { p.rotation.y = p._h * R.tDoor * 1.75; });
+  const docked = R.tState === 'docked';
+  placeTruckBoxes(docked || R.tState === 'arriving' ? R.tCount : (R._tbn || 0));
+  R.driver.g.visible = docked;
+  if (docked){ R.driver.g.position.set(R.tx + 1.4, 0, GATE_Z + 1.45); R.driver.g.rotation.y = -Math.PI / 2 + Math.sin(R.t * 0.7) * 0.3; }
 }
 function catAI(dt, spd){
   const C = R.catSt, g = R.decor.cat;
@@ -602,12 +861,25 @@ function catAI(dt, spd){
 }
 
 /* ---------- камера і керування ---------- */
+// режими камери: зал, підсобка (склад/рампа/кухня), все відділення
+const VIEWS = {
+  hall: {tg: [0.6, 0.5, 0.1], w: 8.2, wp: 6.6, h: 4.6, pitch: 0.78},
+  back: {tg: [2.8, 0.5, -7.9], w: 10.6, wp: 9.0, h: 4.2, pitch: 0.98},
+  all:  {tg: [2.6, 0.5, -3.4], w: 10.6, wp: 8.6, h: 7.4, pitch: 1.08},
+};
+function setMode(m){
+  if (!R || !VIEWS[m]) return;
+  R.mode = m; R.view.yaw = 0; R.view.pitch = VIEWS[m].pitch; R.view.zoom = 1;
+  R.sep.visible = m === 'hall';
+  if (R.ctl) R.ctl.querySelectorAll('[data-h3]').forEach(b => b.classList.toggle('on', b.dataset.h3 === m));
+  R.slow = 0; placeCam();
+}
 function placeCam(){
-  const cam = R.camera, V = R.view;
+  const cam = R.camera, V = R.view, M = VIEWS[R.mode] || VIEWS.hall;
   const vf = cam.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
-  const need = Math.max((cam.aspect < 1.3 ? 6.6 : 8.2) / Math.tan(hf / 2), 4.6 / Math.tan(vf / 2));
-  const dist = clamp(need, 9, 34) * V.zoom;
-  const tg = new Vector3(0.6, 0.5, 0.1);
+  const need = Math.max((cam.aspect < 1.3 ? M.wp : M.w) / Math.tan(hf / 2), M.h / Math.tan(vf / 2));
+  const dist = clamp(need, 9, 44) * V.zoom;
+  const tg = new Vector3(...M.tg);
   cam.position.set(tg.x + dist * Math.sin(V.yaw) * Math.cos(V.pitch), tg.y + dist * Math.sin(V.pitch), tg.z + dist * Math.cos(V.yaw) * Math.cos(V.pitch));
   cam.lookAt(tg);
 }
@@ -623,9 +895,12 @@ function pick(ev){
   const objs = [];
   for (const P of R.people.values()) if (P.cid != null){ objs.push(P.body, P.head); }
   if (R.decor.cat.visible) objs.push(...R.decor.cat.children);
+  const truckHit = R.tState === 'docked' && R.truck.visible;
+  if (truckHit) objs.push(R.truckBoxes, ...R.truck.children[0].children);
   const hit = R.ray.intersectObjects(objs, false)[0];
   if (!hit) return null;
   if (hit.object.userData.P) return {P: hit.object.userData.P};
+  if (truckHit && (hit.object === R.truckBoxes || R.truck.children[0].children.includes(hit.object))) return {truck: true};
   return {cat: true};
 }
 function bindInput(){
@@ -637,7 +912,7 @@ function bindInput(){
       if (Math.abs(dx) + Math.abs(dy) > 7) down.moved = true;
       if (down.moved){
         R.view.yaw = clamp(down.yaw - dx * 0.006, -1.0, 1.0);
-        if (e.pointerType === 'mouse') R.view.pitch = clamp(down.pitch + dy * 0.004, 0.32, 1.25);
+        if (e.pointerType === 'mouse') R.view.pitch = clamp(down.pitch + dy * 0.004, 0.32, 1.35);
         placeCam(); if (R.hint) R.hint.hidden = true;
       }
     } else if (e.pointerType === 'mouse' && performance.now() - (R.hoverT || 0) > 60){
@@ -653,6 +928,7 @@ function bindInput(){
     if (d.moved || performance.now() - d.t > 600) return;
     const h = pick(e);
     if (!h) return;
+    if (h.truck){ B().act('unload3d', {dataset: {}}); return; }
     if (h.cat){ R.catSt.jump = 1; B().beep(880, 0.07, 'sine', 0.05); setTimeout(() => B().beep(660, 0.1, 'sine', 0.04), 90); return; }
     if (h.P.cid != null) B().act('serve', {dataset: {id: String(h.P.cid)}});
   };
@@ -663,9 +939,10 @@ function bindInput(){
     const b = e.target.closest('[data-h3]'); if (!b) return;
     e.stopPropagation();
     const k = b.dataset.h3;
-    if (k === 'in') R.view.zoom = clamp(R.view.zoom * 0.85, 0.5, 1.4);
-    else if (k === 'out') R.view.zoom = clamp(R.view.zoom / 0.85, 0.5, 1.4);
-    else { R.view.yaw = 0; R.view.pitch = 0.78; R.view.zoom = 1; }
+    if (k === 'in') R.view.zoom = clamp(R.view.zoom * 0.85, 0.4, 1.4);
+    else if (k === 'out') R.view.zoom = clamp(R.view.zoom / 0.85, 0.4, 1.4);
+    else if (k === 'hall' || k === 'back' || k === 'all'){ setMode(k); R.userMode = true; return; }
+    else { R.view.yaw = 0; R.view.pitch = VIEWS[R.mode].pitch; R.view.zoom = 1; }
     placeCam();
   });
 }
@@ -695,24 +972,24 @@ function mount(el){
   const canvas = renderer.domElement; canvas.className = 'h3d'; canvas.style.touchAction = 'pan-y';
   el.appendChild(canvas);
   const ctl = document.createElement('div'); ctl.className = 'h3dctl';
-  ctl.innerHTML = '<button data-h3="in" title="Ближче">＋</button><button data-h3="out" title="Далі">－</button><button data-h3="reset" title="Скинути камеру">⟲</button>';
+  ctl.innerHTML = '<button data-h3="hall" title="Зал">🏢</button><button data-h3="back" title="Склад і рампа">📦</button><button data-h3="all" title="Все відділення">🗺️</button><button data-h3="in" title="Ближче">＋</button><button data-h3="out" title="Далі">－</button><button data-h3="reset" title="Скинути камеру">⟲</button>';
   el.appendChild(ctl);
-  const hint = document.createElement('div'); hint.className = 'h3dhint'; hint.textContent = '👆 Тапни клієнта, щоб обслужити · тягни, щоб повернути камеру';
+  const hint = document.createElement('div'); hint.className = 'h3dhint'; hint.textContent = '👆 Тапни клієнта, щоб обслужити · 📦 склад і рампа · тягни, щоб повернути камеру';
   el.appendChild(hint);
   const scene = new Scene(); scene.background = new Color(0x2b2f36);
   const camera = new PerspectiveCamera(38, 2, 0.5, 120);
-  R = {el, renderer, canvas, ctl, hint, scene, camera, people: new Map(), view: {yaw: 0, pitch: 0.78, zoom: 1}, t: 0, doorOpen: 0, ray: new Raycaster(), ptr: new Vector2(), seen: false};
+  R = {el, renderer, canvas, ctl, hint, scene, camera, people: new Map(), view: {yaw: 0, pitch: 0.78, zoom: 1}, mode: 'hall', t: 0, doorOpen: 0, ray: new Raycaster(), ptr: new Vector2(), seen: false};
   R.hemi = new HemisphereLight(0xfff8ee, 0x9c8f7a, 2.4); scene.add(R.hemi);
   R.sun = new DirectionalLight(0xffffff, 1.5); R.sun.position.set(4, 10, 7); scene.add(R.sun);
   R.torch = new PointLight(0xffd59a, 0, 7, 1.6); R.torch.position.set(WX(1), 1.7, -1.0); scene.add(R.torch);
-  buildRoom(); buildCounter(); buildStore(); buildExtras();
+  buildRoom(); buildCounter(); buildStore(); buildBack(); buildExtras(); buildTruck();
   bindInput();
   R.ro = new ResizeObserver(resize); R.ro.observe(el);
   resize();
   document.addEventListener('visibilitychange', ensureLoop);
   sync();
 }
-function reset(){ if (!R) return; for (const P of R.people.values()) removePerson(P); R.people.clear(); R.seen = false; R.boxKey = null; }
+function reset(){ if (!R) return; for (const P of R.people.values()) removePerson(P); R.people.clear(); R.seen = false; R.boxKey = null; R.tState = 'away'; R.tx = TRUCK_AWAY; R.truck.visible = false; R.tDoor = 0; R._tbn = -1; }
 function dispose(){
   if (!R) return;
   if (R.raf) cancelAnimationFrame(R.raf);
@@ -728,4 +1005,4 @@ function screenOf(cid){
   const v = new Vector3(P.pos.x, 1.0, P.pos.z).project(R.camera), r = R.canvas.getBoundingClientRect();
   return {x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height};
 }
-window.Hall3D = {ok, mount, sync, reset, dispose, screenOf, get active(){ return !!R; }};
+window.Hall3D = {ok, mount, sync, reset, dispose, screenOf, setMode: m => { if (R){ setMode(m); R.userMode = true; } }, get mode(){ return R && R.mode; }, get active(){ return !!R; }};
