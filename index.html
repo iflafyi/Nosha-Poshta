@@ -65,7 +65,8 @@ main{padding:4px 10px}
 @media(max-width:700px){.grid2{grid-template-columns:1fr}}
 /* queue */
 .queue{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;min-height:120px;align-items:flex-end}
-.client{min-width:96px;max-width:96px;background:#faf8f5;border:1px solid var(--line);border-radius:12px;padding:6px;text-align:center;position:relative;animation:walkin .5s ease-out}
+.client{min-width:96px;max-width:96px;background:#faf8f5;border:1px solid var(--line);border-radius:12px;padding:6px;text-align:center;position:relative}
+.client.nw{animation:walkin .5s ease-out}
 .client.reg{border-color:var(--amber);background:var(--amber2)}
 .client.me{outline:2px solid var(--red)}
 .client .av{font-size:34px;line-height:1.1}
@@ -263,7 +264,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611012032; // ставиться build.py
+const GAME_BUILD = 202611012050; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -686,6 +687,7 @@ const qDecay = () => [1, 0.85, 0.7][G.up.equeue || 0];
 const satBonus = () => [0, 0.3, 0.5][G.up.ac || 0] + decorSat();
 const tipMul = () => [1, 1.25, 1.45][G.up.coffee || 0] + decorTip();
 const serveT = s => (16 - s.lvl*2) * staffMul(s);            // сек на клієнта
+const sprogPct = s => { if (!s.cl) return 0; const sc = G.queue.find(c => c.id === s.cl); return clamp(s.t/(serveT(s)*(sc && sc.self ? 0.6 : 1))*100, 0, 100); };
 const storeIv = s => (4 - s.lvl*0.5) * (G.up.cart ? 0.7 : 1) * staffMul(s);
 const errCh = s => (0.12 - s.lvl*0.02) * (hasT(s,'careful') ? 0.5 : 1) * (1 + (s.fat||0)/100) * ((s.mood ?? 80) < 30 ? 1.4 : 1);
 const trainCost = s => Math.round(400*s.lvl*[1, 0.7, 0.5][(G && G.up.school) || 0]/10)*10;
@@ -1961,16 +1963,18 @@ function liveUpdate(){
   });
   document.querySelectorAll('[data-sprog]').forEach(el => {
     const s = G.staff.find(s => s.id === +el.dataset.sprog); if (!s) return;
-    el.style.width = s.cl ? clamp(s.t/serveT(s)*100, 0, 100).toFixed(0) + '%' : '0%';
+    el.style.width = sprogPct(s).toFixed(1) + '%';
   });
   const tl = $('#truckleft'); if (tl && G.truck) tl.textContent = hhmm(G.truck.leaveAt);
   $('#dark').classList.toggle('hidden', !(G.phase === 'day' && darkMode()));
 }
+const SEEN_CL = new Set();
 function clientHTML(c){
   const r = clamp(c.pat/c.max, 0, 1);
+  const nw = !SEEN_CL.has(c.id); if (nw) SEEN_CL.add(c.id);
   const who = c.by === 'me' ? '<div class="who">у вас</div>' : c.by === 'coop' ? `<div class="who">🤝 ${esc((NET.coop && NET.coop.peer && NET.coop.peer.nick) || 'друг')}</div>` : c.by ? `<div class="who">${esc((G.staff.find(s=>s.id===c.by)||{}).name||'')}</div>` : '';
   const kd = c.kind === 'info' ? '❓ де посилка?' : c.kind === 'shop' ? '🛍️ вітрина' : c.kind === 'get' ? `📥 отримати${c.pids.length>1?' ×'+c.pids.length:''}` : `📤 відправити${c.items.length>1?' ×'+c.items.length:''}`;
-  return `<div class="client ${c.reg?'reg':''} ${c.by==='me'?'me':''}" data-act="${c.by?'':'serve'}" data-id="${c.id}">
+  return `<div class="client ${nw?'nw':''} ${c.reg?'reg':''} ${c.by==='me'?'me':''}" data-act="${c.by?'':'serve'}" data-id="${c.id}">
     <div class="av">${c.av}</div><div class="nm">${esc(c.name)}</div><div class="kd">${kd}</div>${who}
     ${c.by && c.by!=='me' ? '' : `<div class="pat"><i data-pat="${c.id}" style="width:${r*100}%"></i></div>`}</div>`;
 }
@@ -1989,7 +1993,7 @@ function viewHall(){
        free.length ? `<button class="pri" data-act="serve" data-id="${free[0].id}">🔔 Наступний!</button>` : '<div class="mute">Черги немає ☕</div>'}</div>`;
   for (let w=2; w<=G.up.windows; w++){
     const s = G.staff.filter(s => s.cl)[w-2] || null;
-    wins += `<div class="win ${s?'act':''}"><div class="wt">Віконце ${w}</div>${s ? `<div>${s.av} ${esc(s.name)}</div><div class="pat"><i data-sprog="${s.id}" style="width:0;background:var(--blue)"></i></div>` :
+    wins += `<div class="win ${s?'act':''}"><div class="wt">Віконце ${w}</div>${s ? `<div>${s.av} ${esc(s.name)}</div><div class="pat"><i data-sprog="${s.id}" style="width:${sprogPct(s).toFixed(1)}%;background:var(--blue)"></i></div>` :
       `<div class="mute">${front.length ? 'вільне' : 'немає працівника видачі/прийому'}</div>`}</div>`;
   }
   const t = G.today;
