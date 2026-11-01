@@ -226,6 +226,17 @@ main{padding:4px 10px}
 .sgrid button .pe{font-size:22px;display:block}
 .sgrid button.no{opacity:.35}
 .opened{font-size:46px;text-align:center;padding:6px}
+  .sched{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:6px}
+  .sched .mute{margin-right:4px;font-size:12px}
+  .sched button{padding:3px 7px;font-size:12px;min-width:0;border-radius:8px}
+  .sched button.offd{opacity:.45;text-decoration:line-through}
+  .sched button.today{outline:2px solid var(--red)}
+  .sst{margin-top:4px;font-size:13px;font-weight:600}
+  .sst.bad{color:var(--red)}
+  .wgrid{display:grid;grid-template-columns:auto repeat(7,1fr);gap:3px 4px;margin-top:8px;font-size:13px;text-align:center}
+  .wgrid>span:nth-child(8n+1){text-align:left;white-space:nowrap}
+  .wgrid b.today{color:var(--red)}
+  .wgrid span.zero{color:var(--red);font-weight:700}
 </style>
 </head>
 <body>
@@ -240,7 +251,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202611011858; // ставиться build.py
+const GAME_BUILD = 202611011903; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -345,7 +356,7 @@ const REG = id => REGS.find(r => r.id === id);
 
 const TIERS = ['Пункт видачі','Відділення','Вантажне відділення','Сортувальний хаб'];
 const UPS = {
-  windows:{n:'Віконця', e:'🪟', start:1, costs:[1500,4000,9000], need:[2,4,7], d:l=>l<=1?'Одне віконце — тільки ваше. Персоналу видачі й прийому потрібне ще одне.':`Віконець: ${l}. На віконцях 2–${l} працює ваш персонал видачі й прийому.`},
+  windows:{n:'Віконця', e:'🪟', start:1, costs:[1500,4000,9000,14000], need:[2,4,7,9], d:l=>l<=1?'Одне віконце — тільки ваше. Персоналу видачі й прийому потрібне ще одне.':`Віконець: ${l}. На віконцях 2–${l} працює ваш персонал видачі й прийому.${l === 4 ? ' 5-те — після розширення приміщення.' : ''}`},
   shelves:{n:'Стелажі', e:'🗄️', start:1, costs:[800,2000,4500,9000], need:[1,3,5,8], d:l=>`${smallCount(l)} малих комірок і ${bigCount(l)} габаритних.`},
   scanner:{n:'Сканер', e:'📟', start:0, costs:[1000,3500], need:[2,5], d:l=>['Звичайний пошук','Підсвічує потрібну комірку','Термінал сам знаходить номер телефону'][l]},
   chairs:{n:'Зона очікування', e:'🪑', start:0, costs:[600,1800,4000], need:[1,3,6], d:l=>`Терпіння клієнтів +${l*20}%, черга до ${queueMax(l)} осіб.`},
@@ -355,9 +366,18 @@ const UPS = {
   ads:{n:'Вивіска і реклама', e:'📣', start:0, costs:[1000,3000,7000], need:[2,5,9], d:l=>`Клієнтів більше на ${l*15}%.`},
   locker:{n:'Поштомат', e:'🟥', start:0, costs:[5000,9000,15000], need:[6,8,10], d:l=>l?`${lockerCap(l)} комірок біля входу. Завантаж туди малі посилки на «Складі» — клієнти заберуть самі, без черги (+12 ₴ за кожну).`:'Поштомат біля входу: клієнти забирають посилки самі, без черги.'},
   gen:{n:'Генератор', e:'🔌', start:0, costs:[3500], need:[3], d:l=>l?'Під час відключень світла все працює (пальне 100 ₴ за відключення).':'Без нього при відключенні світла — ручний режим з ліхтариком.'},
+  space:{n:'Розширення приміщення', e:'🏗️', start:0, costs:[8000,20000], need:[6,11], d:l=>['Стандартне приміщення: до 4 віконець.','Добудований склад: +16 малих і +4 габаритні комірки, місце для 5-го віконця.','Друга зала очікування: черга +6, ще 6 крісел, терпіння клієнтів +10%.'][l]},
   tier:{n:'Розширення відділення', e:'🏢', start:0, costs:[6000,15000,35000], need:[5,10,15], d:l=>`${TIERS[l]}: клієнтів +${l*35}%, більші машини, до ${staffMax(l)} працівників.`},
 };
-const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', rest:'😴 Вихідний'};
+const ROLES = {issue:'📥 Видача', accept:'📤 Прийом', store:'📦 Склад', courier:'🛵 Кур’єр', rest:'😴 Вихідний'};
+const WD = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+const wd = (d = G.day) => (d - 1) % 7;
+const LUNCH = [720, 750, 780, 810, 840];
+// чи немає працівника на роботі сьогодні (вихідний за графіком, лікарняний, прогул)
+function offToday(s){ return (s.off || []).includes(wd()) || (s.sick || 0) >= G.day || s.absent === G.day; }
+function onBreak(s){ return G.phase === 'day' && G.time >= (s.lunch || 780) && G.time < (s.lunch || 780) + 30; }
+const courierCap = s => 4 + s.lvl*2;
+const ADDR_ST = ['Шевченка','Франка','Лесі Українки','Грушевського','Садова','Лісова','Миру','Соборна','Зелена','Січових Стрільців','Космонавтів','Набережна'];
 const PACK = [
   {k:0, n:'Конверт', e:'✉️', price:10},
   {k:1, n:'Коробка S', e:'📦', price:25},
@@ -421,6 +441,7 @@ const TASK_T = [
   {k:'mis', t:'Знайди і відправ далі {n} посилок-пересортів', n:[1,2], r:[250,400]},
   {k:'track', t:'Поясни {n} клієнтам, де їхня посилка', n:[1,2], r:[200,350]},
   {k:'sms', t:'Видай посилку без коду з SMS лише за паспортом', n:[1], r:[300]},
+  {k:'courier', t:'Кур’єр має доставити {n} посилок додому', n:[4,6], r:[300,450]},
 ];
 const ACH = [
   {k:'issued', n:'Видавець', e:'📥', t:[50,250,1000,5000], g:()=>G.stats.issued, d:'Видано посилок'},
@@ -573,7 +594,7 @@ function newGame(nick, branch){
   return {v:1, nick, branch, pid:null, secret:null, day:1, time:480, phase:'night', money:1000, xp:0, level:1, rating:3.5,
     stats:{issued:0, sent:0, unloaded:0, placed:0, earned:0, clients:0},
     parcels:[], nid:1, queue:[], cid:1, truck:null, trucksDone:{}, hand:null,
-    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0},
+    up:{windows:1, shelves:1, scanner:0, chairs:0, cart:0, coffee:0, ac:0, ads:0, locker:0, gen:0, tier:0, space:0},
     ev:null, eve:false, weather:'sun', insp:null, lastInsp:0, outage:null, dirt:0,
     tasks:[], ach:{}, rank:0, others:[], city:'Головне', decor:{wall:'cream', items:{}}, badges:[], gifts:[],
     season:null, biz:{}, bizToday:[], regGift:{}, cashChk:null, district:null, streak:null, month:null, expect:[],
@@ -594,12 +615,12 @@ function migrate(g){
 }
 
 /* ---------- формули ---------- */
-const smallCount = (l=G.up.shelves) => 8 + l*8;
-const bigCount = (l=G.up.shelves) => 2 + l*2;
-const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0);
+const smallCount = (l=G.up.shelves) => 8 + l*8 + (G && G.up.space >= 1 ? 16 : 0);
+const bigCount = (l=G.up.shelves) => 2 + l*2 + (G && G.up.space >= 1 ? 4 : 0);
+const queueMax = (l=G.up.chairs) => 6 + l*2 + (G && (G.eve || G.ev) ? 4 : 0) + (G && G.up.space >= 2 ? 6 : 0);
 const staffMax = (l=G.up.tier) => 2 + l*2;
 const needXp = l => Math.round(120*Math.pow(l,1.5));
-const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1) * (1 + decorPat());
+const patMul = () => (1 + G.up.chairs*0.2) * (G.up.coffee ? 1.1 : 1) * (1 + decorPat()) * (G.up.space >= 2 ? 1.1 : 1);
 const satBonus = () => (G.up.ac ? 0.3 : 0) + decorSat();
 const tipMul = () => (G.up.coffee ? 1.25 : 1) + decorTip();
 const serveT = s => (16 - s.lvl*2) * staffMul(s);            // сек на клієнта
@@ -654,7 +675,7 @@ function targetCell(p){
 
 /* ---------- щоденні завдання і досягнення ---------- */
 function genTasks(){
-  const pool = shuffle(TASK_T.filter(t => (t.k !== 'regs' || G.level >= 2) && (t.k !== 'insp' || G.level >= 3) && (t.k !== 'intl' || G.level >= 3) && (!['mis','track','sms'].includes(t.k) || G.level >= 2) && (!['fraud','refuse','lost','insp','claim','intl','cod','mis','track','sms'].includes(t.k) || Math.random() < 0.5))).slice(0, 3);
+  const pool = shuffle(TASK_T.filter(t => (t.k !== 'regs' || G.level >= 2) && (t.k !== 'insp' || G.level >= 3) && (t.k !== 'intl' || G.level >= 3) && (!['mis','track','sms'].includes(t.k) || G.level >= 2) && (t.k !== 'courier' || G.staff.some(s => s.role === 'courier')) && (!['fraud','refuse','lost','insp','claim','intl','cod','mis','track','sms'].includes(t.k) || Math.random() < 0.5))).slice(0, 3);
   G.tasks = pool.map(t => { const i = ri(0, t.n.length - 1); return {k:t.k, n:t.n[i], r:t.r[i], prog:0, done:false}; });
 }
 function taskText(t){ return TASK_T.find(x => x.k === t.k).t.replace('{n}', fmt(t.n)); }
@@ -853,6 +874,7 @@ function truckArrive(kind){
       const p = makeParcel();
       ids.push(p.id);
       if (G.level >= 2 && Math.random() < 0.05){ p.mis = {br: ri(2, 99), city: pick(CITIES)}; continue; }
+      if (G.level >= 4 && p.s <= 3 && G.staff.some(s => s.role === 'courier') && Math.random() < 0.18) p.addr = {x: ri(5, 95), y: ri(5, 78), st: `${pick(ADDR_ST)}, ${ri(1, 120)}`};
       if (Math.random() < 0.15 && i < n-1){ ids.push(makeParcel({phone:p.phone, name:p.name}).id); i++; }
     }
     G.truck = {kind:'in', leaveAt:leave, key:kind};
@@ -883,7 +905,8 @@ function truckLeave(){
 
 /* ---------- клієнти ---------- */
 function readyParcels(){
-  return G.parcels.filter(p => p.state === 'cell' && !p.res && !p.mis && !p.addr && (p.inDay < G.day || G.time - p.inT >= 20));
+  const cour = G.staff.some(s => s.role === 'courier');
+  return G.parcels.filter(p => p.state === 'cell' && !p.res && !p.mis && (!p.addr || !cour) && (p.inDay < G.day || G.time - p.inT >= 20));
 }
 function spawnClient(force){
   if (G.queue.length >= queueMax()) return;
@@ -1115,8 +1138,13 @@ function frontBusy(){ return G.staff.filter(s => s.cl).length; }
 function staffTick(dt){
   const crowd = G.queue.length > 6;
   for (const s of G.staff){
-    if (s.training || s.role === 'rest'){ s.cl = null; continue; }
+    s.away = offToday(s);
+    if (s.training || s.role === 'rest' || s.away){ releaseStaff(s); s.brk = false; continue; }
+    const brk = s.role !== 'courier' && onBreak(s);
+    if (brk !== !!s.brk){ s.brk = brk; dirty = true; if (brk) releaseStaff(s); }
+    if (brk){ s.fat = Math.max(0, (s.fat||0) - dt*0.3); continue; }
     s.fat = Math.min(100, (s.fat||0) + dt*0.17*(hasT(s,'calm') ? 0.5 : crowd ? 1.5 : 1));
+    if (s.role === 'courier'){ courierTick(s); continue; }
     if (s.role === 'store'){
       s.t += dt;
       if (s.t >= storeIv(s)){ s.t = 0; storeAction(s); }
@@ -1133,6 +1161,78 @@ function staffTick(dt){
       }
     }
   }
+}
+function releaseStaff(s){ if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c && c.by === s.id) c.by = null; s.cl = null; dirty = true; } }
+/* ---------- кур'єр адресної доставки ---------- */
+const DEPOT = {x:50, y:92};
+const addrReady = () => G.parcels.filter(p => p.state === 'cell' && p.addr && !p.res && (p.inDay < G.day || G.time - p.inT >= 20));
+const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function routeLen(pts){ let d = 0, cur = DEPOT; for (const p of pts){ d += dist2(cur, p); cur = p; } return (d + dist2(cur, DEPOT)) / 25; }
+function optLen(pts){
+  let left = pts.slice(), cur = DEPOT, ord = [];
+  while (left.length){ left.sort((a,b) => dist2(cur,a) - dist2(cur,b)); cur = left.shift(); ord.push(cur); }
+  let best = routeLen(ord), imp = true;
+  while (imp){ imp = false;
+    for (let i = 0; i < ord.length - 1; i++) for (let j = i + 1; j < ord.length; j++){
+      const t = ord.slice(0, i).concat(ord.slice(i, j + 1).reverse(), ord.slice(j + 1)), l = routeLen(t);
+      if (l < best - 1e-9){ best = l; ord = t; imp = true; }
+    }
+  }
+  return best;
+}
+function courierTick(s){
+  if (s.route){ if (G.time >= s.route.back) courierBack(s); return; }
+  for (const t of [660, 930]){
+    const key = G.day*10000 + t;
+    if (G.time >= t && G.time < t + 4 && s.autoAt !== key){
+      s.autoAt = key;
+      const ps = addrReady().slice(0, courierCap(s));
+      if (ps.length >= 2){ courierGo(s, shuffle(ps)); toast(`🛵 ${esc(s.name)} поїхав(ла) розвозити сам(а), без маршруту — вийде довше`); }
+    }
+  }
+}
+function courierGo(s, ps, planned){
+  const km = routeLen(ps.map(p => p.addr)), opt = optLen(ps.map(p => p.addr));
+  ps.forEach(p => { p.state = 'courier'; p.cell = null; });
+  const dur = Math.round((20 + km*10) * staffMul(s) / (1 + (s.lvl - 1)*0.08));
+  s.route = {pids:ps.map(p => p.id), back:G.time + dur, km:+km.toFixed(1), opt:+opt.toFixed(1), planned:!!planned};
+  dirty = true; return s.route;
+}
+function courierBack(s){
+  const R = s.route; if (!R) return;
+  const eff = R.opt / Math.max(0.1, R.km);
+  let ok = 0, fail = 0, money = 0;
+  for (const id of R.pids){
+    const p = G.parcels.find(p => p.id === id); if (!p) continue;
+    if (Math.random() < 0.88){
+      ok++; money += 35 + Math.round(p.cod*0.02) + (eff > 0.9 ? 15 : 0); G.today.cashIn += p.cod;
+      G.parcels = G.parcels.filter(x => x !== p); G.stats.issued++; G.today.issued++;
+    } else { fail++; p.state = 'cell'; p.cell = targetCell(p); if (!p.cell){ p.state = 'pile'; } p.inT = G.time; }
+  }
+  G.stats.courier = (G.stats.courier||0) + ok;
+  if (eff > 0.85) G.rating = clamp(G.rating + 0.005*ok, 1, 5);
+  s.fat = Math.min(100, (s.fat||0) + 12); s.route = null;
+  addMoney(money); addXp(3*ok); countTask('courier', ok);
+  toast(`🛵 ${esc(s.name)} повернувся(лась): доставлено ${ok}${fail ? `, ${fail} — нікого не було вдома (назад у комірки)` : ''} · +${money} ₴${eff > 0.9 ? ' · клієнти задоволені швидкістю' : ''}`, 'good');
+}
+function showRoute(sid){
+  const s = G.staff.find(x => x.id === sid); if (!s || s.route) return;
+  const R = NET.route && NET.route.sid === sid ? NET.route : (NET.route = {sid, order:[]});
+  const ps = addrReady().slice(0, courierCap(s)), ord = R.order.filter(id => ps.some(p => p.id === id));
+  R.order = ord;
+  const pts = ord.map(id => ps.find(p => p.id === id).addr), km = ord.length ? routeLen(pts) : 0, opt = ps.length ? optLen(ps.map(p => p.addr)) : 0;
+  const X = v => 10 + v*2.8, Y = v => 10 + v*2.2;
+  let line = `M${X(DEPOT.x)},${Y(DEPOT.y)} ` + pts.map(a => `L${X(a.x)},${Y(a.y)}`).join(' ');
+  if (ord.length === ps.length && ps.length) line += ` L${X(DEPOT.x)},${Y(DEPOT.y)}`;
+  showModal('🗺️ Маршрут кур’єра', `<p>${s.av} <b>${esc(s.name)}</b> бере до ${courierCap(s)} посилок. Натискай на адреси в тому порядку, як їхати. Коротший маршрут — швидше повернеться, а клієнти дадуть чайові.</p>
+    <svg viewBox="0 0 300 220" style="width:100%;max-width:520px;display:block;margin:0 auto;background:#e8f4f8;border-radius:12px">
+      <path d="M0,60 L300,40 M80,0 L120,220 M200,0 L230,220 M0,160 L300,140" stroke="#fff" stroke-width="7" fill="none"/>
+      <path d="${line}" stroke="#d7262b" stroke-width="2.5" fill="none" stroke-dasharray="5 3"/>
+      <g transform="translate(${X(DEPOT.x)},${Y(DEPOT.y)})"><rect x="-14" y="-10" width="28" height="20" rx="5" fill="#d7262b"/><text y="4" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">НП</text></g>
+      ${ps.map(p => { const i = ord.indexOf(p.id); return `<g transform="translate(${X(p.addr.x)},${Y(p.addr.y)})" data-act="rtpick" data-id="${p.id}" style="cursor:pointer"><circle r="11" fill="${i >= 0 ? '#1f3a5f' : '#fff'}" stroke="#1f3a5f" stroke-width="2"/><text y="4" text-anchor="middle" font-size="${i >= 0 ? 11 : 12}" fill="${i >= 0 ? '#fff' : '#000'}" font-weight="700">${i >= 0 ? i + 1 : p.e}</text></g>`; }).join('')}
+    </svg>
+    <div class="terminal" style="margin-top:8px">🛵 Маршрут: <b>${km.toFixed(1)} км</b>${ord.length === ps.length && ps.length ? ` · найкоротший можливий ≈ ${opt.toFixed(1)} км` : ` · обрано ${ord.length}/${ps.length} адрес`}<br>${ord.map((id,i) => { const p = ps.find(x => x.id === id); return `${i+1}. вул. ${p.addr.st} — ${p.e} ${esc(p.name)}${p.cod ? ` · 💰 ${p.cod} ₴` : ''}`; }).join('<br>')}</div>
+    <div class="row"><button class="sm ghost" data-act="rtreset">↺ Скинути</button><span class="sp"></span><button class="pri" data-act="rtgo" data-id="${sid}" ${ord.length && ord.length === ps.length ? '' : 'disabled'}>🛵 Відправити кур’єра</button></div>`);
 }
 function staffFinish(s, forceErr){
   const c = G.queue.find(c => c.id === s.cl); s.cl = null; s.t = 0;
@@ -1305,9 +1405,9 @@ function simOthers(){
   for (const b of G.others){
     let inc = 0, sal = 0, lv = 0, work = 0;
     for (const s of b.staff || []){
-      if (s.role === 'rest'){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); continue; }
+      if (s.role === 'rest' || (s.off || []).includes(wd())){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); continue; }
       work++; sal += s.salary; lv += s.lvl;
-      const k = (s.role === 'store' ? 140 : 280) * s.lvl / staffMul(s);
+      const k = (s.role === 'store' ? 140 : s.role === 'courier' ? 200 : 280) * s.lvl / staffMul(s);
       inc += k;
       s.fat = Math.min(100, (s.fat||0) + 25); s.mood = clamp((s.mood ?? 80) - 5, 0, 100); s.fat = Math.max(0, s.fat - 20);
     }
@@ -1456,7 +1556,15 @@ function startDay(){
   if (G.inv) setTimeout(() => toast('📋 Сьогодні інвентаризація! Зроби її на вкладці «Склад» до кінця зміни.', 'gold'), 3000);
   const se = curSeason(); if (se) setTimeout(() => toast(`${se.e} ${se.n}! ${se.d}`, 'gold'), 1400);
   SCENE.spr.forEach(d => d.remove()); SCENE.spr.clear(); SCENE.seen = false; if (SCENE.is3d && window.Hall3D) Hall3D.reset();
-  G.staff.forEach(s => { s.bonusDay = 0; });
+  G.staff.forEach(s => { s.bonusDay = 0; s.brk = false; s.route = null; });
+  const news = [];
+  for (const s of G.staff){
+    if (s.role === 'rest' || (s.off || []).includes(wd()) || (s.sick || 0) >= G.day || s.training) continue;
+    if (Math.random() < 0.025){ s.sick = G.day + ri(0, 2); news.push(`🤒 ${esc(s.name)} захворів(ла) — лікарняний до дня ${s.sick} (50% зарплати)`); }
+    else if (Math.random() < ((s.mood ?? 80) < 40 ? 0.05 : 0.012)){ s.absent = G.day; news.push(`📵 ${esc(s.name)} не вийшов(ла) на роботу і не бере трубку!`); }
+  }
+  news.forEach((t, i) => setTimeout(() => toast(t, 'bad'), 3600 + i*700));
+  G.staff.forEach(s => { s.away = offToday(s); });
   if (G.candDay < G.day || !G.cand.length) refreshCand();
   truckArrive('m');
   TAB = 'ramp';
@@ -1469,9 +1577,10 @@ function endDay(){
   if (G.insp && G.insp.state === 'on') inspFinish(true);
   for (const c of [...G.queue]) removeClient(c);
   G.queue = [];
-  // зарплати
+  for (const s of G.staff) if (s.route) courierBack(s);
+  // зарплати (вихідний і прогул — без оплати, лікарняний — 50%)
   let sal = 0;
-  for (const s of G.staff) if (s.role !== 'rest') sal += s.salary;
+  for (const s of G.staff){ if (s.role === 'rest' || (s.off || []).includes(wd()) || s.absent === G.day) continue; sal += (s.sick || 0) >= G.day ? Math.round(s.salary/2) : s.salary; }
   G.money -= sal; G.today.salaries = sal;
   // навчання
   const trained = [];
@@ -1479,9 +1588,10 @@ function endDay(){
   // настрій і втома персоналу
   const quit = [];
   for (const s of G.staff){
-    if (s.role === 'rest'){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); }
+    if (s.role === 'rest' || offToday(s)){ s.fat = 0; s.mood = Math.min(100, (s.mood ?? 80) + 20); s.wk = 0; }
     else {
-      s.mood = clamp((s.mood ?? 80) - ((s.fat||0) > 60 ? 12 : 4) * (hasT(s,'cheerful') ? 0.5 : 1) + (G.up.coffee ? 3 : 0) + (decorSat() > 0.2 ? 2 : 0), 0, 100);
+      s.wk = (s.wk || 0) + 1;
+      s.mood = clamp((s.mood ?? 80) - ((s.fat||0) > 60 ? 12 : 4) * (hasT(s,'cheerful') ? 0.5 : 1) + (G.up.coffee ? 3 : 0) + (decorSat() > 0.2 ? 2 : 0) - (s.wk > 5 ? 8 : 0), 0, 100);
       s.fat = Math.max(0, (s.fat||0) - 45);
     }
     if (s.mood < 15 && Math.random() < 0.4) quit.push(s);
@@ -1772,7 +1882,7 @@ function viewHall(){
       ${regsCard()}`;
   }
   const free = G.queue.filter(c => !c.by);
-  const front = G.staff.filter(s => (s.role==='issue'||s.role==='accept') && !s.training);
+  const front = G.staff.filter(s => (s.role==='issue'||s.role==='accept') && !s.training && !s.away && !s.brk);
   let wins = `<div class="win act"><div class="wt">Віконце 1 · Ви</div>
      ${FLOW ? '<div class="mute">Обслуговуєте клієнта…</div><button class="sm" data-act="reopen">Продовжити</button>' :
        free.length ? `<button class="pri" data-act="serve" data-id="${free[0].id}">🔔 Наступний!</button>` : '<div class="mute">Черги немає ☕</div>'}</div>`;
@@ -1843,7 +1953,7 @@ function rackHTML(mode, needCells=[], pickedCells=[]){
 }
 function parcelHTML(p, act, scanAct){
   return `<div class="parcel s${p.s} ${G.hand===p.id?'sel':''}" data-act="${act}" data-id="${p.id}">
-    <div class="pe">${p.e}</div><div class="tag">${SIZE_N[p.s]} · ${p.w} кг</div>${p.f?'<div class="tag fr">⚠ КРИХКЕ</div>':''}${p.gift?'<div class="tag">🎁 ПОДАРУНОК</div>':''}${scanAct ? bcHTML(p.ttn, scanAct, p.id, true) : `<div class="tag">…${String(p.ttn).slice(-4)}</div>`}</div>`;
+    <div class="pe">${p.e}</div><div class="tag">${SIZE_N[p.s]} · ${p.w} кг</div>${p.f?'<div class="tag fr">⚠ КРИХКЕ</div>':''}${p.gift?'<div class="tag">🎁 ПОДАРУНОК</div>':''}${p.addr?'<div class="tag">🛵 кур’єр</div>':''}${scanAct ? bcHTML(p.ttn, scanAct, p.id, true) : `<div class="tag">…${String(p.ttn).slice(-4)}</div>`}</div>`;
 }
 function outTag(p){ return (p.intl ? `<div class="tag">${CFLAG(p.intl)} за кордон</div>` : '') + (p.misOut ? '<div class="tag">🔀 пересорт</div>' : '') + (p.ret ? '<div class="tag fr">🔙 повернення</div>' : p.redir ? '<div class="tag">↪ переадресація</div>' : ''); }
 function viewStore(){
@@ -1897,8 +2007,11 @@ function viewStaff(){
       ${(s.traits||[]).length ? `<div class="traits">${s.traits.map(t => `<span title="${TRAITS[t].d}">${TRAITS[t].n}</span>`).join('')}</div>` : ''}
       <div class="mbars"><span>😊 Настрій</span><div class="lvl"><i class="on" style="flex:none;width:${s.mood ?? 80}%;background:${(s.mood??80)<30?'var(--red)':(s.mood??80)<60?'var(--amber)':'var(--green)'}"></i></div>
         <span>😩 Втома</span><div class="lvl"><i class="on" style="flex:none;width:${s.fat||0}%;background:${(s.fat||0)>60?'var(--red)':'var(--amber)'}"></i></div></div>
-      <div class="mute">Зарплата ${s.salary} ₴/день · ${s.training ? '📚 На навчанні до кінця дня ' + s.training : s.role==='store' ? `розкладає посилку кожні ${storeIv(s).toFixed(1)} с` : s.role==='rest' ? 'Вихідний (без зарплати)' : `обслуговує клієнта за ${serveT(s)} с, помилки ${Math.round(errCh(s)*100)}%`}</div>
-      ${s.training ? '' : `<div class="roles">${Object.entries(ROLES).map(([k,n]) => `<button class="${s.role===k?'on':''}" data-act="role" data-id="${s.id}" data-role="${k}">${n}</button>`).join('')}</div>`}
+      <div class="mute">Зарплата ${s.salary} ₴/день · ${s.training ? '📚 На навчанні до кінця дня ' + s.training : s.role==='store' ? `розкладає посилку кожні ${storeIv(s).toFixed(1)} с` : s.role==='rest' ? 'Вихідний (без зарплати)' : s.role==='courier' ? `адресна доставка: до ${courierCap(s)} посилок за рейс` : `обслуговує клієнта за ${serveT(s)} с, помилки ${Math.round(errCh(s)*100)}%`}</div>
+      ${staffStatus(s)}
+      ${s.training ? '' : `<div class="roles">${Object.entries(ROLES).map(([k,n]) => `<button class="${s.role===k?'on':''}" data-act="role" data-id="${s.id}" data-role="${k}" ${k === 'courier' && G.level < 4 && s.role !== k ? 'disabled title="З 4 рівня"' : ''}>${n}${k === 'courier' && G.level < 4 ? ' 🔒' : ''}</button>`).join('')}</div>`}
+      ${s.role === 'rest' ? '' : `<div class="sched"><span class="mute">Графік:</span>${WD.map((d,i) => `<button class="${(s.off||[]).includes(i) ? 'offd' : 'on'} ${G.phase === 'day' && i === wd() ? 'today' : ''}" data-act="sched" data-id="${s.id}" data-v="${i}" title="${(s.off||[]).includes(i) ? 'вихідний' : 'робочий'}">${d}</button>`).join('')}</div>
+        ${s.role !== 'courier' ? `<div class="sched"><span class="mute">Обід:</span>${LUNCH.map(t => `<button class="${(s.lunch||780) === t ? 'on' : ''}" data-act="lunch" data-id="${s.id}" data-v="${t}">${hhmm(t)}</button>`).join('')}</div>` : ''}`}
       <div class="row" style="margin-top:6px">
         ${s.lvl < 5 && !s.training ? `<button class="sm" data-act="train" data-id="${s.id}">📚 Навчання · ${fmt(trainCost(s))} ₴</button>` : ''}
         <button class="sm" data-act="bonus" data-id="${s.id}" ${s.bonusDay === G.day ? 'disabled' : ''}>💵 Премія 200 ₴</button>
@@ -1907,14 +2020,41 @@ function viewStaff(){
       ${(s.traits||[]).length ? `<div class="traits">${s.traits.map(t => `<span title="${TRAITS[t].d}">${TRAITS[t].n}</span>`).join('')}</div><div class="mute">${s.traits.map(t => TRAITS[t].d).join('; ')}</div>` : ''}
       <div class="mute">Хоче ${s.salary} ₴/день</div><button class="ok sm" style="margin-top:6px" data-act="hire" data-id="${s.id}" ${G.staff.length>=max?'disabled':''}>Найняти</button></div></div>`).join('');
   const sal = G.staff.reduce((a,s) => a + (s.role==='rest'?0:s.salary), 0);
-  return `<div class="card"><h3>👥 Персонал <span class="mute">(${G.staff.length}/${max})</span></h3>
-     <div class="mute">Зарплати: <b>${fmt(sal)} ₴</b> в кінці кожного дня. Видача і прийом потребують вільних віконець (зараз ${G.up.windows}, перше — ваше). Склад розвантажує машину, розкладає посилки і вантажить відправлення. Навчання триває до кінця дня, і працівник у цей час не працює. Втома росте за роботою (особливо коли черга велика), вихідний повністю відновлює сили. Якщо настрій впаде дуже низько — працівник може звільнитись.</div></div>
+  return `${weekGrid()}${courierCard()}<div class="card"><h3>👥 Персонал <span class="mute">(${G.staff.length}/${max})</span></h3>
+     <div class="mute">Зарплати: до <b>${fmt(sal)} ₴</b> в кінці кожного дня (у вихідний за графіком — без оплати, на лікарняному — 50%). Хто працює більше 5 днів поспіль — втрачає настрій. Кожен іде на обід на 30 хв у свій час. Видача і прийом потребують вільних віконець (зараз ${G.up.windows}, перше — ваше). Склад розвантажує машину, розкладає посилки і вантажить відправлення. Навчання триває до кінця дня, і працівник у цей час не працює. Втома росте за роботою (особливо коли черга велика), вихідний повністю відновлює сили. Якщо настрій впаде дуже низько — працівник може звільнитись.</div></div>
      ${staff || '<div class="card mute">Поки працюєте самі. Найміть когось, щоб було легше!</div>'}
      <div class="card"><h3>🧾 Кандидати <span class="mute">(оновлюються щодня)</span></h3>${G.staff.length>=max?'<div class="mute">Більше місць немає — розширте відділення.</div>':''}</div>
      <div class="grid2">${cand}</div>`;
 }
+function staffStatus(s){
+  if (G.phase !== 'day') return (s.sick || 0) > G.day - 1 && (s.sick || 0) >= G.day ? `<div class="sst bad">🤒 Лікарняний до дня ${s.sick}</div>` : '';
+  if ((s.sick || 0) >= G.day) return `<div class="sst bad">🤒 Лікарняний до дня ${s.sick}</div>`;
+  if (s.absent === G.day) return '<div class="sst bad">📵 Сьогодні не вийшов(ла) на роботу</div>';
+  if ((s.off || []).includes(wd())) return '<div class="sst">🏖️ Сьогодні вихідний за графіком</div>';
+  if (s.route) return `<div class="sst">🛵 На маршруті (${s.route.km} км), повернеться ≈${hhmm(s.route.back)}</div>`;
+  if (s.brk) return `<div class="sst">🍽️ На обіді до ${hhmm((s.lunch||780) + 30)}</div>`;
+  return '';
+}
+function weekGrid(){
+  if (!G.staff.length) return '';
+  const cnt = (i, roles) => G.staff.filter(s => roles.includes(s.role) && !(s.off||[]).includes(i)).length;
+  return `<div class="card"><h3>🗓️ Графік на тиждень</h3><div class="mute">Сьогодні ${G.phase === 'day' ? WD[wd()] : `вночі; завтра ${WD[wd(G.day)]}`}. Натискай на дні в картці працівника, щоб зробити вихідний.</div>
+    <div class="wgrid"><span></span>${WD.map((d,i) => `<b class="${i === wd() ? 'today' : ''}">${d}</b>`).join('')}
+      <span>🪟 Віконця</span>${WD.map((d,i) => { const n = cnt(i, ['issue','accept']); return `<span class="${n ? '' : 'zero'}">${n}</span>`; }).join('')}
+      <span>📦 Склад</span>${WD.map((d,i) => { const n = cnt(i, ['store']); return `<span class="${n ? '' : 'zero'}">${n}</span>`; }).join('')}
+      ${G.staff.some(s => s.role === 'courier') ? `<span>🛵 Кур’єр</span>${WD.map((d,i) => `<span>${cnt(i, ['courier'])}</span>`).join('')}` : ''}</div></div>`;
+}
+function courierCard(){
+  const cs = G.staff.filter(s => s.role === 'courier'); if (!cs.length) return '';
+  const ready = G.phase === 'day' ? addrReady().length : 0;
+  return `<div class="card"><h3>🛵 Адресна доставка</h3><div class="mute">Посилки з позначкою 🛵 клієнти замовили додому: їх не видають у віконці, їх розвозить кур’єр. Склади маршрут сам — коротший шлях = швидше і з чайовими. О 11:00 і 15:30 кур’єр поїде сам, але навмання.</div>
+    <div style="margin-top:6px">Готово до доставки: <b>${ready}</b> пос.</div>
+    ${cs.map(s => `<div class="task"><span style="font-size:24px">${s.av}</span><div style="flex:1"><b>${esc(s.name)}</b>${staffStatus(s) || '<div class="mute">на місці, чекає на маршрут</div>'}</div>
+      ${G.phase === 'day' && !s.route && !s.away ? `<button class="sm pri" data-act="route" data-id="${s.id}" ${ready ? '' : 'disabled'}>🗺️ Маршрут</button>` : ''}</div>`).join('')}</div>`;
+}
 function upNext(k){ const u = UPS[k]; const i = G.up[k] - u.start; return i < u.costs.length ? {cost:u.costs[i], need:u.need[i]} : null; }
-function affordableUps(){ let n = 0; for (const k in UPS){ const nx = upNext(k); if (nx && G.level >= nx.need && G.money >= nx.cost) n++; } return n; }
+const upLock = k => k === 'windows' && G.up.windows >= 4 && G.up.space < 1 ? '🔒 Потрібне розширення приміщення' : '';
+function affordableUps(){ let n = 0; for (const k in UPS){ const nx = upNext(k); if (nx && !upLock(k) && G.level >= nx.need && G.money >= nx.cost) n++; } return n; }
 function viewUps(){
   return decorCard() + `<div class="ups">${Object.entries(UPS).map(([k,u]) => {
     const l = G.up[k], nx = upNext(k), max = u.start + u.costs.length;
@@ -1923,8 +2063,8 @@ function viewUps(){
       <div class="lvl">${bars}</div>
       <div class="mute" style="min-height:36px">${u.d(l)}</div>
       ${nx ? `<div class="mute" style="margin:4px 0">Далі: ${u.d(l+1)}</div>
-        <button class="${G.level>=nx.need && G.money>=nx.cost ? 'ok' : ''}" style="width:100%" data-act="buy" data-k="${k}" ${G.level<nx.need||G.money<nx.cost?'disabled':''}>
-        ${G.level < nx.need ? `🔒 Потрібен рівень ${nx.need}` : `Купити · ${fmt(nx.cost)} ₴`}</button>` : '<div class="mute"><b>✅ Максимум</b></div>'}</div>`;
+        <button class="${G.level>=nx.need && G.money>=nx.cost && !upLock(k) ? 'ok' : ''}" style="width:100%" data-act="buy" data-k="${k}" ${G.level<nx.need||G.money<nx.cost||upLock(k)?'disabled':''}>
+        ${upLock(k) || (G.level < nx.need ? `🔒 Потрібен рівень ${nx.need}` : `Купити · ${fmt(nx.cost)} ₴`)}</button>` : '<div class="mute"><b>✅ Максимум</b></div>'}</div>`;
   }).join('')}</div>`;
 }
 
@@ -2832,6 +2972,18 @@ function act(a, el){
     case 'invopen': if (!G.inv || G.inv.state !== 'due') return; return showInv();
     case 'invans': { const r = invRows()[id]; if (r){ r.ans = el.dataset.v; showInv(); } return; }
     case 'invdone': return invDone();
+    case 'sched': { const s = G.staff.find(s => s.id === id); if (!s) return; const d = +el.dataset.v; s.off = s.off || [];
+      if (s.off.includes(d)) s.off = s.off.filter(x => x !== d); else { if (s.off.length >= 3) return toast('Максимум 3 вихідні на тиждень', 'bad'); s.off.push(d); }
+      if (G.phase === 'day' && d === wd()) toast(s.off.includes(d) ? `🏖️ ${esc(s.name)} пішов(ла) додому — сьогодні вихідний` : `👋 ${esc(s.name)} вийшов(ла) на роботу`);
+      save(); dirty = true; return; }
+    case 'lunch': { const s = G.staff.find(s => s.id === id); if (s){ s.lunch = +el.dataset.v; save(); dirty = true; } return; }
+    case 'route': NET.route = null; return showRoute(id);
+    case 'rtpick': { const R = NET.route; if (!R) return; if (R.order.includes(id)) R.order = R.order.filter(x => x !== id); else R.order.push(id); beep(700, 0.04, 'triangle'); return showRoute(R.sid); }
+    case 'rtreset': { const R = NET.route; if (!R) return; R.order = []; return showRoute(R.sid); }
+    case 'rtgo': { const s = G.staff.find(s => s.id === id), R = NET.route; if (!s || !R || s.route || G.phase !== 'day') return;
+      const ps = R.order.map(i => G.parcels.find(p => p.id === i)).filter(p => p && p.state === 'cell'); if (!ps.length) return;
+      const r = courierGo(s, ps, true); closeModal(); NET.route = null; sBell();
+      toast(`🛵 ${esc(s.name)} поїхав(ла): ${r.km} км${r.km <= r.opt * 1.05 ? ' — ідеальний маршрут! 👌' : ` (найкоротший був ${r.opt} км)`} · повернеться ≈${hhmm(r.back)}`, 'good'); return; }
     case 'misout': { const p = G.parcels.find(p => p.id === G.hand); if (!p || !p.mis) return; misOut(p); sScan(); addXp(6); countTask('mis', 1); toast(`🔀 Пересорт відкладено — поїде у відділення №${p.mis.br} (${p.mis.city}) вечірньою машиною`, 'good'); return; }
     case 'serve': if (!FLOW) sayNext(); return openServe(id || (G.queue.find(c => !c.by)||{}).id);
     case 'reopen': if (FLOW){ FLOW.hidden = false; renderFlow(); } return;
@@ -2914,7 +3066,7 @@ function act(a, el){
       G.time += ps.length; toast(`Розвантажено ${ps.length} посилок, пройшло ${ps.length} хв`); dirty = true; return;
     }
     case 'load': { const p = G.parcels.find(p => p.id === id); if (p && p.state === 'outgoing'){ p.state = 'loaded'; beep(500,0.05,'triangle'); addXp(1); } dirty = true; return; }
-    case 'role': { const s = G.staff.find(s => s.id === id); if (s){ s.role = el.dataset.role; if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; s.cl = null; } } dirty = true; return; }
+    case 'role': { const s = G.staff.find(s => s.id === id); if (s && s.route) return toast('Кур’єр зараз на маршруті', 'bad'); if (s && el.dataset.role === 'courier' && G.level < 4) return; if (s){ s.role = el.dataset.role; if (s.cl){ const c = G.queue.find(c => c.id === s.cl); if (c) c.by = null; s.cl = null; } } dirty = true; return; }
     case 'train': {
       const s = G.staff.find(s => s.id === id); if (!s) return;
       const cost = trainCost(s);
@@ -2936,7 +3088,7 @@ function act(a, el){
       toast(`👋 ${esc(s.name)} тепер працює у вас!`, 'good'); dirty = true; return;
     }
     case 'buy': {
-      const k = el.dataset.k, nx = upNext(k); if (!nx || G.level < nx.need || G.money < nx.cost) return;
+      const k = el.dataset.k, nx = upNext(k); if (!nx || upLock(k) || G.level < nx.need || G.money < nx.cost) return;
       G.money -= nx.cost; G.up[k]++; sCash();
       toast(`${UPS[k].e} ${UPS[k].n}: рівень ${G.up[k]}!`, 'good'); save(); dirty = true; return;
     }

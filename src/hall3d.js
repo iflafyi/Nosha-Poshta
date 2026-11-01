@@ -13,7 +13,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let R = null;
 
 /* ---------- розмітка відділення ---------- */
-const WX = i => -5.2 + (i - 1) * 2.3;      // x віконця i (1..4)
+const WX = i => -5.2 + (i - 1) * 2.3;      // x віконця i (1..5; 5-те — після розширення)
 const SERVE_Z = -0.8, OP_Z = -2.4;
 const DOOR = {x: 7, z: 1.5};
 const DOOR_IN = [6.0, 1.5], STREET = 8.4;
@@ -21,6 +21,7 @@ const RACK_X = i => -5.25 + i * 1.75;       // стелажі вздовж за�
 const SHELF_Y = [0.19, 0.74, 1.29, 1.84];
 const SLOT_X = [-0.57, -0.19, 0.19, 0.57];
 const CHAIR = j => [-6.25, -0.1 + j * 0.5];
+const CHAIR2 = j => [-4.6 + j * 0.75, 4.15];   // друга зала: ряд крісел біля вітрини
 // підсобка за залом
 const BACK_Z = -4.6, BACK_END = -11.2;
 const DOOR_BACK = 6.2;                      // прохід зал ↔ склад (x)
@@ -139,7 +140,10 @@ function buildCounter(){
   blk(9.4, 0.12, 0.62, 0xd7262b, -1.75, 0.55, -1.285 + 0.0); // червона смуга спереду (тонка)
   blk(9.6, 0.06, 0.8, 0x9c7a55, -1.75, 1.0, -1.6);          // стільниця
   R.wins = [];
-  for (let i = 1; i <= 4; i++){
+  // добудова стійки під 5-те віконце
+  R.ext5 = new Group(); S.add(R.ext5);
+  blk(2.1, 1.0, 0.62, 0xf6f4f0, 4.0, 0, -1.6, R.ext5); blk(2.1, 0.12, 0.62, 0xd7262b, 4.0, 0.55, -1.285, R.ext5); blk(2.2, 0.06, 0.8, 0x9c7a55, 4.0, 1.0, -1.6, R.ext5);
+  for (let i = 1; i <= 5; i++){
     const x = WX(i), g = new Group(); g.position.set(x, 0, 0); S.add(g);
     const w = {g, x, i};
     // табличка з номером
@@ -172,10 +176,14 @@ function buildCounter(){
   blk(0.08, 0.16, 0.08, 0x333333, 0, 0, 0, R.scanner); blk(0.08, 0.08, 0.2, 0xf1c40f, 0, 0.14, 0.05, R.scanner);
   // принтер ТТН
   blk(0.3, 0.16, 0.26, 0xeeeeee, x1 + 0.75, 1.03, -1.85); blk(0.2, 0.01, 0.1, 0xffffff, x1 + 0.75, 1.19, -1.75);
-  // бар'єр «тільки для персоналу»
-  blk(4.1, 0.95, 0.08, 0x8f9aa3, 4.95, 0, -1.6);
-  blk(4.1, 0.06, 0.14, 0x9c7a55, 4.95, 0.95, -1.6);
-  plane(1.5, 0.26, plateTex('Тільки для персоналу', {w: 512, h: 88, bg: '#ffffff', fg: '#c0392b', font: 'bold 40px system-ui,sans-serif', border: '#c0392b', r: 10}), 4.95, 0.6, -1.55);
+  // бар'єр «тільки для персоналу» (коротшає, коли добудовано 5-те віконце)
+  const barTex = plateTex('Тільки для персоналу', {w: 512, h: 88, bg: '#ffffff', fg: '#c0392b', font: 'bold 40px system-ui,sans-serif', border: '#c0392b', r: 10});
+  R.barFull = new Group(); S.add(R.barFull);
+  blk(4.1, 0.95, 0.08, 0x8f9aa3, 4.95, 0, -1.6, R.barFull); blk(4.1, 0.06, 0.14, 0x9c7a55, 4.95, 0.95, -1.6, R.barFull);
+  plane(1.5, 0.26, barTex, 4.95, 0.6, -1.55, 0, R.barFull);
+  R.barShort = new Group(); S.add(R.barShort); R.barShort.visible = false;
+  blk(1.95, 0.95, 0.08, 0x8f9aa3, 6.03, 0, -1.6, R.barShort); blk(1.95, 0.06, 0.14, 0x9c7a55, 6.03, 0.95, -1.6, R.barShort);
+  plane(1.5, 0.26, barTex, 6.03, 0.6, -1.55, 0, R.barShort);
 }
 
 /* ---------- склад ---------- */
@@ -413,6 +421,14 @@ function buildExtras(){
     for (const a of [-0.17, 0.17]) for (const b of [-0.17, 0.17]) blk(0.04, 0.42, 0.04, 0x555555, a, 0, b, g);
     E.chairs.push(g);
   }
+  // друга зала: крісла біля вітрини, обличчям до стійки
+  E.chairs2 = [];
+  for (let j = 0; j < 6; j++){
+    const [x, z] = CHAIR2(j), g = grp(x, 0, z);
+    blk(0.44, 0.06, 0.44, 0x16a085, 0, 0.42, 0, g); blk(0.44, 0.45, 0.06, 0x16a085, 0, 0.45, 0.2, g);
+    for (const a of [-0.17, 0.17]) for (const b of [-0.17, 0.17]) blk(0.04, 0.42, 0.04, 0x555555, a, 0, b, g);
+    E.chairs2.push(g);
+  }
   // кавоапарат на столику
   E.coffee = grp(3.55, 0, -1.2);
   blk(0.7, 0.75, 0.45, 0x8d6e63, 0, 0, 0, E.coffee); blk(0.32, 0.45, 0.3, 0x2c2c2c, 0, 0.75, 0, E.coffee);
@@ -580,7 +596,7 @@ function lineSpot(k){
   return [-0.6 + j * 0.8, 3.1 + (row - 2) * 0.8];
 }
 function faceAlong(a, b){ return Math.atan2(b[0] - a[0], b[1] - a[1]); }
-function frontStaff(G){ return (G.staff || []).filter(s => (s.role === 'issue' || s.role === 'accept') && !s.training).slice(0, Math.max(0, (G.up.windows || 1) - 1)); }
+function frontStaff(G){ return (G.staff || []).filter(s => (s.role === 'issue' || s.role === 'accept') && !s.training && !s.away && !s.brk).slice(0, Math.max(0, (G.up.windows || 1) - 1)); }
 
 /* ---------- синхронізація зі станом гри ---------- */
 function sync(){
@@ -596,10 +612,11 @@ function sync(){
   if (tWant && (R.tState === 'away' || R.tState === 'leaving')){ R.tState = 'arriving'; R.tKind = tWant; R.truck.visible = true; if (R.tx > 16) R.tx = TRUCK_AWAY; }
   if (!tWant && (R.tState === 'docked' || R.tState === 'arriving')) R.tState = 'leaving';
   R.tCount = (G.parcels || []).filter(p => p.state === (R.tKind === 'out' ? 'loaded' : 'truck')).length;
-  const wins = clamp(G.up.windows || 1, 1, 4), front = frontStaff(G);
+  const wins = clamp(G.up.windows || 1, 1, (G.up.space || 0) >= 1 ? 5 : 4), front = frontStaff(G);
   // віконця
   R.wins.forEach((w, k) => {
     const open = k < wins, st = k === 0 ? 'me' : front[k - 1];
+    w.g.visible = k < 4 || (G.up.space || 0) >= 1;
     w.closed.visible = !open; w.mon.visible = open;
     const busy = k === 0 ? G.queue.some(c => c.by === 'me') : !!(st && st.cl);
     const pk = `${open}|${busy}|${k === 0 || !!st}`;
@@ -616,11 +633,11 @@ function sync(){
     want.set(`op${k}:${st.id}:${st.av}`, {kind: 'op', w: k, st});
   }
   // складські працівники
-  (G.staff || []).filter(s => s.role === 'store' && !s.training).slice(0, 4).forEach(s => want.set(`st${s.id}:${s.av}`, {kind: 'store', st: s}));
+  (G.staff || []).filter(s => s.role === 'store' && !s.training && !s.away).slice(0, 4).forEach(s => want.set(`st${s.id}:${s.av}`, {kind: 'store', st: s}));
   // інспектор
   if (G.insp && G.insp.state === 'on') want.set('insp', {kind: 'insp'});
   // клієнти
-  const free = G.queue.filter(c => !c.by), nCh = clamp((G.up.chairs || 0) * 3, 0, 9);
+  const free = G.queue.filter(c => !c.by), nCh = clamp((G.up.chairs || 0) * 3, 0, 9), nCh2 = (G.up.space || 0) >= 2 ? 6 : 0;
   G.queue.forEach(c => want.set('c' + c.id, {kind: 'client', c}));
   for (const [key, w] of want){
     let P = R.people.get(key);
@@ -652,14 +669,15 @@ function sync(){
       if (c.by){
         let wi = 1;
         if (c.by !== 'me'){ const k = front.findIndex(s => s.id === c.by); wi = k >= 0 ? k + 2 : 2; }
-        P.goal = [WX(clamp(wi, 1, 4)), SERVE_Z]; P.face = Math.PI; P.sit = false;
+        P.goal = [WX(clamp(wi, 1, wins)), SERVE_Z]; P.face = Math.PI; P.sit = false;
       } else {
         const k = free.indexOf(c);
         let spot, face;
-        if (k < 7 || k - 7 >= nCh){
-          const kk = k < 7 ? k : k - nCh; spot = lineSpot(kk);
+        if (k < 7 || k - 7 >= nCh + nCh2){
+          const kk = k < 7 ? k : k - nCh - nCh2; spot = lineSpot(kk);
           face = kk === 0 ? Math.PI : faceAlong(spot, lineSpot(kk - 1)); P.sit = false;
-        } else { spot = CHAIR(k - 7); spot = [spot[0] + 0.05, spot[1]]; face = Math.PI / 2; P.sit = true; }
+        } else if (k - 7 < nCh){ spot = CHAIR(k - 7); spot = [spot[0] + 0.05, spot[1]]; face = Math.PI / 2; P.sit = true; }
+        else { spot = CHAIR2(k - 7 - nCh); spot = [spot[0], spot[1] - 0.05]; face = Math.PI; P.sit = true; }
         P.goal = spot; P.face = face;
       }
       P.cid = c.by ? null : c.id;
@@ -696,6 +714,10 @@ function syncSlow(G, br){
   const E = R.extras, U = G.up;
   if (R.mode !== 'hall'){ R.decor.clock.visible = false; R.decor.flag.visible = false; }
   E.chairs.forEach((c, j) => { c.visible = j < (U.chairs || 0) * 3; });
+  const sp = U.space || 0;
+  E.chairs2.forEach(c => { c.visible = sp >= 2; });
+  R.ext5.visible = sp >= 1; R.barFull.visible = sp < 1; R.barShort.visible = sp >= 1;
+  E.coffee.position.set(sp >= 1 ? 1.3 : 3.55, 0, sp >= 1 ? 4.1 : -1.2);
   E.coffee.visible = !!U.coffee; E.ac.visible = !!U.ac && R.mode === 'hall'; E.gen.visible = !!U.gen; E.ads.visible = !!U.ads;
   E.locker.visible = !!U.locker;
   if (U.locker){ const w = 0.6 + U.locker * 0.4; E.lockerBody.scale.z = w; E.lockerGrid.scale.x = w * 0.85; E.locker.position.z = 2.4 + w / 2; }
@@ -794,10 +816,10 @@ function chooseSpot(P){
   const outN = (G.parcels || []).filter(p => p.state === 'outgoing').length;
   if (docked && R.tKind === 'out' && outN > 0 && r < 0.75)
     return {x: OUTCART[0] - 0.85, z: OUTCART[1] + rnd(0.4), face: Math.PI / 2, carry: false, wait: 0.5, chain: [{x: 7.45, z: GATE_Z + rnd(0.9), face: Math.PI / 2, carry: true, wait: 0.6}]};
-  if ((st.fat || 0) > 55 && r < 0.3){
+  if (st.brk || ((st.fat || 0) > 55 && r < 0.3)){
     const used = new Set([...R.people.values()].filter(q => q !== P && q.goal).map(q => q.goal.join()));
     const ch = R.kChairs.find(c => !used.has(`${c[0]},${c[1]}`));
-    if (ch) return {x: ch[0], z: ch[1], face: ch[2], carry: false, sit: true, mood: '☕', wait: 5 + Math.random() * 4};
+    if (ch) return {x: ch[0], z: ch[1], face: ch[2], carry: false, sit: true, mood: st.brk ? '🍽️' : '☕', wait: st.brk ? 3 : 5 + Math.random() * 4};
   }
   if (r < 0.05 && !R.wcBusy && ![...R.people.values()].some(q => q.inWC)) return {x: -2.85, z: -10.2, face: 0, carry: false, wc: true, wait: 3};
   const pool = [
