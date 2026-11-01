@@ -238,7 +238,7 @@ main{padding:4px 10px}
 <div id="dark" class="hidden"></div>
 <script>
 'use strict';
-const GAME_BUILD = 202610312031; // ставиться build.py
+const GAME_BUILD = 202611011006; // ставиться build.py
 const CFG = window.GAME_CONFIG || {};
 const SAVE_KEY = 'np-save-v1';
 const MIN_PER_SEC = 1.8; // ігрових хвилин за реальну секунду (зміна 12 год ≈ 6,5 хв)
@@ -1911,7 +1911,7 @@ function showGuide(){
     <li><b>Особливі клієнти:</b> хочуть розкрити посилку перед оплатою (бій чи не та річ — оформи відмову), просять переадресувати чи повернути посилку, приходять «по посилку для мами» (перевір довіреність — шахраям відмовляй!), шлють цінні речі з оголошеною вартістю. Буває, посилки немає в комірці — шукай на складі.</li>
     <li><b>Події:</b> свята й розпродажі (більше посилок і додаткова машина), погода, раптова перевірка менеджера (тримай зал чистим 🧹), відключення світла (купи 🔌 генератор).</li>
     <li><b>🎯 Кар’єра:</b> щоденні завдання, досягнення, підвищення до регіонального керівника і друге відділення в іншому місті. В «Покращеннях» — 🎨 оформлення залу.</li>
-    <li><b>🌐 Онлайн</b>: рейтинг, тижневий конкурс, чат, гостювання у відділеннях друзів з відгуками і подарунки, які приходять посилкою. Гра зберігається автоматично (і в хмару теж). У ⚙️ можна встановити гру на телефон.</li></ol>
+    <li><b>🌐 Онлайн</b>: рейтинг, тижневий конкурс, чат, гостювання у відділеннях друзів з відгуками і подарунки, які приходять посилкою. Гра зберігається автоматично (і в хмару теж). У ⚙️ можна створити 👤 акаунт з поштою й паролем і грати одним відділенням на телефоні та комп’ютері, а ще встановити гру на телефон.</li></ol>
     <button class="pri" style="width:100%" data-act="mclose">Зрозуміло, до роботи!</button>`);
 }
 function showSettings(){
@@ -1924,6 +1924,7 @@ function showSettings(){
       <button data-act="voice">${G.settings.voice !== false ? '🗣️ «Наступний!»: так' : '🗣️ «Наступний!»: ні'}</button>
       <button data-act="s3d">${G.settings.s3d !== false ? '🧊 3D зал: так' : '🧊 3D зал: ні (простий)'}</button></div></div>
     <div class="card"><h3>📲 Застосунок на телефон</h3>${installHTML()}</div>
+    <div class="card"><h3>👤 Акаунт</h3>${accountHTML()}</div>
     <div class="card"><h3>☁️ Збереження</h3>
       ${G.pid ? `<div class="mute">Код збереження — щоб грати цим відділенням на іншому пристрої. Нікому його не показуй!</div><div class="code" style="margin:6px 0">${code}</div><button class="sm" data-act="copycode">📋 Скопіювати</button>`
         : `<div class="mute">Відділення ще не підключене до онлайну.</div><button class="sm" data-act="register">Підключити онлайн</button>`}
@@ -2040,6 +2041,14 @@ function act(a, el){
     case 'install': return doInstall();
     case 'copycode': { const t = $('.code').textContent; navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Скопійовано', 'good'), () => {}); return; }
     case 'restore': return restoreFromCode($('#rcode').value.trim());
+    case 'login': return showLogin();
+    case 'dologin': return doLogin(el);
+    case 'obback': return showOnboard();
+    case 'acclink': return accLink(el);
+    case 'accpass': return accPass(el);
+    case 'acclogout': return accLogout();
+    case 'devaccreset': { const pid = $('#devapl').value, pw = $('#devapw').value || ''; if (!pid) return toast('Обери гравця', 'bad'); if (pw.length < 6) return toast('Пароль — мінімум 6 символів', 'bad');
+      devCall('np_admin_acc_reset', {p_player:pid, p_pass:pw}).then(r => { if (r) toast(`🔑 Пароль для ${r} змінено. Передай його гравцю.`, 'good'); }); return; }
     case 'register': return registerOnline();
     case 'onltab': NET.sub = el.dataset.v; if (NET.sub === 'week') loadWeek(); if (NET.sub === 'rev') loadMyReviews(); if (NET.sub === 'dev') devRefresh(); dirty = true; return;
     case 'revstar': NET.revStars = +el.dataset.v; if (NET.visit) NET.visit.draw(NET.visit.revs); return;
@@ -2059,7 +2068,7 @@ function act(a, el){
     case 'lbsort': NET.sort = el.dataset.v; NET.top = null; loadTop(); dirty = true; return;
     case 'chatsend': return chatSend();
     case 'player': return showPlayer(el.dataset.id);
-    case 'onboard': return onboard();
+    case 'onboard': return onboard(el);
     case 'regnick': { const n = ($('#regnick').value || '').trim().slice(0,24); if (n.length < 2) return toast('Мінімум 2 символи', 'bad'); closeModal(); return registerOnline(n); }
   }
 }
@@ -2111,16 +2120,20 @@ function hallPayload(){
 }
 function statsPayload(){ const w = weekParcels(); return {branch:G.branch, level:G.level, rating:+G.rating.toFixed(2), parcels:G.stats.issued + G.stats.sent, money:Math.round(G.money), staff:G.staff.length, days:G.day - 1, rank:G.rank, hall:hallPayload(), wk:w.k, wk_parcels:w.n}; }
 async function cloudSave(force){
-  if (!G || !G.pid || NET.saving) return false;
-  if (!force && Date.now() - NET.lastCloud < 55000) return false;
+  if (!G || !G.pid || NET.saving || NET.expired) return false;
+  // спершу перевіряємо, чи інший пристрій не зберіг новіший прогрес — щоб не перезаписати його старим
+  if (NET.needSync){ if (!document.hidden) cloudSync(); return false; }
+  if (!force && (document.hidden || Date.now() - NET.lastCloud < 55000)) return false;
   NET.saving = true;
   try {
+    G.rev = (G.rev || 0) + 1;
     save();
     const st = JSON.parse(JSON.stringify(G)); delete st.secret;
     await rpc('np_save', {p_id:G.pid, p_secret:G.secret, p_state:JSON.stringify(st), p_build:GAME_BUILD, p_stats:statsPayload()});
     NET.lastCloud = Date.now(); return true;
   } catch(e){
     if (/outdated game build/.test(e.message)){ save(); location.reload(); }
+    if (/not your player/.test(e.message)) sessionExpired();
     return false;
   } finally { NET.saving = false; }
 }
@@ -2147,18 +2160,43 @@ async function registerOnline(nickOverride){
 async function cloudSync(){
   if (!G || !G.pid) return;
   try {
+    const pid = G.pid;
     const r = await rpc('np_load', {p_id:G.pid, p_secret:G.secret});
+    if (!G || G.pid !== pid) return;
     NET.admin = !!(r && r.admin);
     if (r && r.build && r.build > GAME_BUILD){ save(); location.reload(); return; }
-    if (r && r.state && r.saved_at > (G.savedAt || 0) + 2000){
-      const st = migrate(JSON.parse(r.state));
-      st.pid = G.pid; st.secret = G.secret;
-      G = st; FLOW = null; closeModal(); save();
-      toast('☁️ Завантажено новіший прогрес з хмари', 'good');
+    if (r && r.state){
+      const cs = JSON.parse(r.state);
+      const newer = (cs.rev || G.rev) ? (cs.rev || 0) > (G.rev || 0) : r.saved_at > (G.savedAt || 0) + 2000;
+      if (newer){
+        const st = migrate(cs);
+        st.pid = G.pid; st.secret = G.secret; st.acc = G.acc || st.acc;
+        G = st; FLOW = null; closeModal(); save();
+        toast('☁️ Завантажено новіший прогрес з іншого пристрою', 'good');
+      }
     }
+    NET.needSync = false; NET.lastSync = Date.now();
     NET.lastCloud = Date.now();
+    refreshAcc();
     dirty = true;
-  } catch(e){ /* офлайн — граємо далі */ }
+  } catch(e){
+    if (/not your player/.test(e.message)) sessionExpired();
+    /* офлайн — граємо далі */
+  }
+}
+function sessionExpired(){
+  if (NET.expired || !G || !G.acc) return;
+  NET.expired = true;
+  const email = G.acc;
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+  G = null; FLOW = null;
+  showLogin(`🔒 Вхід для <b>${esc(email)}</b> завершено (змінено пароль). Увійди знову — прогрес чекає в хмарі.`);
+  setTimeout(() => { const i = $('#lgemail'); if (i) i.value = email; }, 60);
+}
+function syncOnReturn(){
+  if (!G || !G.pid || document.hidden || NET.expired) return;
+  if (Date.now() - (NET.lastSync || 0) < 8000) return;
+  NET.needSync = true; cloudSync();
 }
 async function restoreFromCode(code){
   try {
@@ -2171,6 +2209,107 @@ async function restoreFromCode(code){
     G = st; FLOW = null; save(); closeModal(); connectChat();
     toast('✅ Відділення відновлено!', 'good'); dirty = true;
   } catch(e){ toast('Код не підходить', 'bad'); }
+}
+/* ---------- акаунти: пошта + пароль ---------- */
+function accErr(m){
+  m = String(m || '');
+  if (/email taken/.test(m)) return 'Ця пошта вже зареєстрована. Спробуй увійти.';
+  if (/bad email/.test(m)) return 'Перевір адресу пошти.';
+  if (/bad password/.test(m)) return 'Пароль: від 6 до 72 символів.';
+  if (/nick taken/.test(m)) return 'Цей нікнейм вже зайнятий — придумай інший.';
+  if (/bad nick/.test(m)) return 'Нікнейм: від 2 до 24 символів.';
+  if (/already linked/.test(m)) return 'До цього відділення вже прив’язана пошта.';
+  if (/wrong password/.test(m)) return 'Старий пароль неправильний.';
+  if (/offline|Failed to fetch|NetworkError/i.test(m)) return 'Немає зв’язку з сервером. Перевір інтернет.';
+  return 'Помилка: ' + m;
+}
+const busy = (el, on) => { if (el){ el.disabled = on; el.style.opacity = on ? .6 : ''; } };
+function showLogin(msg){
+  const fromStart = !G;
+  showModal('🔑 Вхід в акаунт', `
+    ${msg ? `<div class="card" style="border-color:var(--bad)">${msg}</div>` : ''}
+    <div class="card"><div class="mute">Пошта</div><input id="lgemail" type="email" autocomplete="email" maxlength="120" placeholder="you@gmail.com">
+      <div class="mute" style="margin-top:8px">Пароль</div><input id="lgpass" type="password" autocomplete="current-password" maxlength="72"></div>
+    <button class="pri" style="width:100%;padding:12px" data-act="dologin">Увійти</button>
+    <div class="mute" style="margin-top:10px">Прогрес відділення завантажиться з хмари і синхронізуватиметься між усіма пристроями, де ти увійшов.</div>
+    <div class="mute" style="margin-top:6px">Забув пароль? Напиши в чат гри — розробник скине його.</div>
+    ${fromStart ? '<button class="ghost" style="width:100%;margin-top:10px" data-act="obback">← Назад до нової гри</button>' : ''}`);
+  if (fromStart) $('#modal .x').classList.add('hidden');
+  setTimeout(() => { const i = $('#lgemail'); if (i) i.focus(); }, 50);
+}
+async function doLogin(btn){
+  const email = ($('#lgemail').value || '').trim(), pass = $('#lgpass').value || '';
+  if (!email || !pass) return toast('Введи пошту і пароль', 'bad');
+  busy(btn, true);
+  try {
+    const r = await rpc('np_acc_login', {p_email:email, p_pass:pass});
+    if (r && r.err === 'locked') return toast('Забагато невдалих спроб. Спробуй через 10 хвилин.', 'bad');
+    if (!r || r.err) return toast('Неправильна пошта або пароль', 'bad');
+    if (G && G.pid && G.pid !== r.id && (G.day > 1 || G.stats.issued + G.stats.sent > 0)){
+      const warn = G.acc ? `Відділення «${G.branch}» збережене в акаунті ${G.acc} — до нього можна буде повернутись.`
+        : 'Поточне відділення на цьому пристрої не прив’язане до пошти — без коду збереження воно пропаде!';
+      if (!confirm(`Увійти як ${r.nick}?\n\n${warn}`)) return;
+    }
+    if (G && G.pid && G.pid !== r.id) await cloudSave(true);
+    const d = await rpc('np_load', {p_id:r.id, p_secret:r.secret});
+    let st = d && d.state ? migrate(JSON.parse(d.state)) : (G && G.pid === r.id ? G : newGame(r.nick, 'Відділення №1'));
+    st.pid = r.id; st.secret = r.secret; st.nick = r.nick; st.acc = r.email;
+    G = st; FLOW = null; NET.admin = !!(d && d.admin); NET.lastCloud = NET.lastSync = Date.now(); NET.needSync = false; NET.expired = false;
+    save(); closeModal(); connectChat(); loadTop(); chatPoll();
+    toast(`✅ Вітаємо, ${r.nick}! Прогрес синхронізовано.`, 'good');
+    dirty = true;
+  } catch(e){ toast(accErr(e.message), 'bad'); }
+  finally { busy(btn, false); }
+}
+async function accLink(btn){
+  const email = ($('#acemail').value || '').trim(), p1 = $('#acpass').value || '', p2 = $('#acpass2').value || '';
+  if (!email) return toast('Введи пошту', 'bad');
+  if (p1.length < 6) return toast('Пароль — мінімум 6 символів', 'bad');
+  if (p1 !== p2) return toast('Паролі не збігаються', 'bad');
+  busy(btn, true);
+  try {
+    G.acc = await rpc('np_acc_link', {p_id:G.pid, p_secret:G.secret, p_email:email, p_pass:p1});
+    save(); cloudSave(true); showSettings();
+    toast('✅ Акаунт створено! Тепер входь цією поштою на будь-якому пристрої.', 'good');
+  } catch(e){
+    if (/already linked/.test(e.message)) refreshAcc().then(showSettings);
+    toast(accErr(e.message), 'bad');
+  } finally { busy(btn, false); }
+}
+async function accPass(btn){
+  const o = $('#acold').value || '', n = $('#acnew').value || '';
+  if (n.length < 6) return toast('Новий пароль — мінімум 6 символів', 'bad');
+  busy(btn, true);
+  try { await rpc('np_acc_pass', {p_id:G.pid, p_secret:G.secret, p_old:o, p_new:n}); $('#acold').value = $('#acnew').value = ''; toast('🔒 Пароль змінено', 'good'); }
+  catch(e){ toast(accErr(e.message), 'bad'); }
+  finally { busy(btn, false); }
+}
+async function accLogout(){
+  if (!confirm(`Вийти з акаунта ${G.acc}?\n\nПрогрес збережеться в хмарі, на цьому пристрої почнеться з вікна входу.`)) return;
+  await cloudSave(true);
+  try { await rpc('np_acc_logout', {p_id:G.pid, p_secret:G.secret}); } catch(e){}
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+  G = null; location.reload();
+}
+async function refreshAcc(){
+  if (!G || !G.pid) return;
+  try { const e = await rpc('np_acc_info', {p_id:G.pid, p_secret:G.secret}); if ((e || null) !== (G.acc || null)){ G.acc = e || null; save(); } } catch(e){}
+}
+function accountHTML(){
+  if (!NET.ok) return '<div class="mute">Онлайн недоступний.</div>';
+  if (G.acc) return `<div>Ти увійшов як <b>${esc(G.acc)}</b>. Прогрес синхронізується між усіма твоїми пристроями.</div>
+    <details style="margin-top:8px"><summary>🔒 Змінити пароль</summary>
+      <input id="acold" type="password" autocomplete="current-password" placeholder="Старий пароль" style="margin-top:6px">
+      <input id="acnew" type="password" autocomplete="new-password" placeholder="Новий пароль (від 6 символів)" style="margin-top:6px">
+      <button class="sm pri" style="margin-top:6px" data-act="accpass">Змінити</button></details>
+    <div class="row" style="margin-top:8px"><button class="sm" data-act="login">🔑 Увійти в інший акаунт</button><button class="sm ghost" data-act="acclogout">🚪 Вийти</button></div>`;
+  if (!G.pid) return `<div class="mute">Спершу підключи відділення до онлайну (нижче), потім створи акаунт.</div>
+    <button class="sm" style="margin-top:6px" data-act="login">🔑 Увійти в акаунт</button>`;
+  return `<div class="mute">Прив’яжи пошту і пароль — тоді зможеш грати цим відділенням на телефоні й комп’ютері, просто увійшовши.</div>
+    <input id="acemail" type="email" autocomplete="email" maxlength="120" placeholder="Пошта" style="margin-top:6px">
+    <input id="acpass" type="password" autocomplete="new-password" maxlength="72" placeholder="Пароль (від 6 символів)" style="margin-top:6px">
+    <input id="acpass2" type="password" autocomplete="new-password" maxlength="72" placeholder="Повтори пароль" style="margin-top:6px">
+    <div class="row" style="margin-top:6px"><button class="sm pri" data-act="acclink">✅ Створити акаунт</button><button class="sm" data-act="login">🔑 Вже маю акаунт</button></div>`;
 }
 async function loadTop(){
   try { NET.top = await rpc('np_top', {p_sort: NET.sort}); if (TAB === 'online') dirty = true; } catch(e){ NET.top = NET.top || []; }
@@ -2325,6 +2464,9 @@ function viewDev(){
       <input id="devgn" type="number" value="1000" min="1" max="999999" style="width:110px"></div>
     <input id="devgnote" maxlength="120" placeholder="Записка" style="margin-top:6px"><button class="pri sm" style="margin-top:6px" data-act="devgift">Надіслати</button>
     <div class="mute" style="margin-top:4px">Подарунок приїде гравцю посилкою з найближчою машиною.</div></div>
+  <div class="card"><h3>🔑 Скинути пароль гравцю</h3><div class="mute">Якщо гравець забув пароль від акаунта: задай новий і передай йому (в чаті чи особисто). Усі його пристрої попросять увійти знову.</div>
+    <div class="row" style="margin-top:6px"><select id="devapl" style="width:auto"><option value="">— обери гравця —</option>${pl.map(x => `<option value="${x.id}">${esc(x.nickname)}</option>`).join('')}</select>
+      <input id="devapw" maxlength="72" placeholder="Новий пароль" style="width:160px" autocomplete="off"><button class="sm pri" data-act="devaccreset">Скинути</button></div></div>
   <div class="card"><h3>👥 Гравці</h3><table class="lb"><tr><th>Нік</th><th>Рів.</th><th>Був</th></tr>${pl.map(x => `<tr data-act="player" data-id="${x.id}" style="cursor:pointer"><td><span class="dot ${x.online?'on':''}"></span>${esc(x.nickname)}</td><td>${x.level}</td><td>${new Date(x.last_seen).toLocaleString('uk-UA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')}</table>
     <div class="mute" style="margin-top:6px">Щоб видалити повідомлення в чаті — натисни 🗑 біля нього.</div></div>`;
 }
@@ -2447,10 +2589,25 @@ async function doInstall(){
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* ---------- старт ---------- */
-function onboard(){
+async function onboard(btn){
   const nick = ($('#obnick').value || '').trim().slice(0,24);
   const br = ($('#obbranch').value || '').trim().slice(0,40) || 'Відділення №1';
+  const email = ($('#obemail').value || '').trim(), pass = $('#obpass').value || '';
   if (nick.length < 2){ toast('Введи нікнейм (мінімум 2 символи)', 'bad'); return; }
+  if (email || pass){
+    if (!email) return toast('Введи пошту або залиш обидва поля порожніми', 'bad');
+    if (pass.length < 6) return toast('Пароль — мінімум 6 символів', 'bad');
+    busy(btn, true);
+    try {
+      const r = await rpc('np_acc_register', {p_nick:nick, p_branch:br, p_email:email, p_pass:pass});
+      G = newGame(nick, br); G.pid = r.id; G.secret = r.secret; G.acc = r.email;
+      save(); closeModal(); dirty = true; cloudSave(true); connectChat();
+      toast('🌐 Акаунт створено, онлайн підключено!', 'good');
+      showGuide();
+    } catch(e){ toast(accErr(e.message), 'bad'); }
+    finally { busy(btn, false); }
+    return;
+  }
   G = newGame(nick, br); save(); closeModal();
   dirty = true;
   registerOnline();
@@ -2461,14 +2618,18 @@ function showOnboard(){
     <p>Ти — новий оператор маленького пункту видачі. Розвантажуй машини, розкладай посилки по комірках, обслуговуй клієнтів і розвивай своє відділення до справжнього хабу!</p>
     <div class="card"><div class="mute">Твій нікнейм (буде видно в рейтингу і чаті)</div><input id="obnick" maxlength="24" placeholder="Наприклад, Оператор Дмитро">
       <div class="mute" style="margin-top:8px">Назва відділення</div><input id="obbranch" maxlength="40" value="Відділення №1, вул. Центральна"></div>
+    <div class="card"><div class="mute">👤 Акаунт (необов’язково) — щоб грати на телефоні й комп’ютері з одним прогресом</div>
+      <input id="obemail" type="email" autocomplete="email" maxlength="120" placeholder="Пошта" style="margin-top:6px">
+      <input id="obpass" type="password" autocomplete="new-password" maxlength="72" placeholder="Пароль (від 6 символів)" style="margin-top:6px"></div>
     <button class="pri" style="width:100%;padding:14px" data-act="onboard">🚀 Почати роботу</button>
-    <div class="mute" style="margin-top:10px">Вже грав на іншому пристрої? Відкрий ⚙️ після старту і введи код збереження.</div>`);
+    <button style="width:100%;margin-top:8px" data-act="login">🔑 Вже маю акаунт — увійти</button>
+    <div class="mute" style="margin-top:10px">Грав без акаунта? Код збереження можна ввести в ⚙️ після старту.</div>`);
   $('#modal .x').classList.add('hidden');
 }
 function boot(){
   G = loadLocal();
   if (!G){ showOnboard(); G = null; }
-  else { cloudSync(); connectChat(); }
+  else { if (G.pid) NET.needSync = true; cloudSync(); connectChat(); }
   setInterval(tick, 100);
   setInterval(() => { if (G){ save(); } }, 15000);
   setInterval(() => { if (G && G.pid){ cloudSave(); } }, 60000);
@@ -2481,7 +2642,8 @@ function boot(){
   setInterval(() => { if (G){ pollGlobal(); pollAnnounce(); } }, 180000);
   setInterval(() => { if (G && G.pid){ pullGifts(); } }, 300000);
   window.addEventListener('beforeunload', save);
-  document.addEventListener('visibilitychange', () => { if (document.hidden && G){ save(); cloudSave(true); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && G){ save(); cloudSave(true); } else syncOnReturn(); });
+  window.addEventListener('focus', syncOnReturn);
 }
 boot();
 </script>

@@ -1,5 +1,5 @@
 -- Наша Пошта: акаунти (пошта + пароль) і сесії пристроїв.
--- Запустити один раз у Supabase → SQL Editor (проєкт nsdjlohfagslhfaygstp).
+-- Застосовано в базі 2026-11-01 (міграції np_accounts_email_password, np_acc_login_lockout_fix, np_acc_helpers_search_path).
 
 create table if not exists public.np_accounts (
   email text primary key,
@@ -68,14 +68,14 @@ create or replace function public.np_acc_login(p_email text, p_pass text)
 declare e text := lower(btrim(coalesce(p_email,''))); a np_accounts%rowtype; sec text; nick text;
 begin
   select * into a from np_accounts where email = e;
-  if not found then perform pg_sleep(0.3); raise exception 'wrong login'; end if;
-  if a.locked_until is not null and a.locked_until > now() then raise exception 'locked'; end if;
+  if not found then perform pg_sleep(0.3); return jsonb_build_object('err', 'wrong'); end if;
+  if a.locked_until is not null and a.locked_until > now() then return jsonb_build_object('err', 'locked'); end if;
   if a.pass_hash <> crypt(coalesce(p_pass,''), a.pass_hash) then
     update np_accounts set
       locked_until = case when fails + 1 >= 5 then now() + interval '10 minutes' else null end,
       fails = case when fails + 1 >= 5 then 0 else fails + 1 end
     where email = e;
-    raise exception 'wrong login';
+    return jsonb_build_object('err', 'wrong');  -- не raise: інакше лічильник невдач відкотиться
   end if;
   update np_accounts set fails = 0, locked_until = null where email = e;
   sec := encode(gen_random_bytes(24), 'hex');
@@ -122,3 +122,6 @@ begin
 end $$;
 
 revoke execute on function public.np_acc_norm(text), public.np_acc_pwcheck(text) from anon, authenticated, public;
+
+alter function public.np_acc_norm(text) set search_path = public;
+alter function public.np_acc_pwcheck(text) set search_path = public;
